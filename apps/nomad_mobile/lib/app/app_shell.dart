@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
 import '../ui/workspace_view.dart';
 
@@ -8,11 +9,13 @@ const double kTabletBreakpoint = 600.0;
 class AppShell extends StatefulWidget {
   final ProjectRepository repository;
   final WorkspaceRepository workspaceRepository;
+  final FileContentRepository contentRepository;
 
   const AppShell({
     super.key,
     required this.repository,
     required this.workspaceRepository,
+    required this.contentRepository,
   });
 
   @override
@@ -22,12 +25,35 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   Project? _selectedProject;
+  FileNode? _activeFileNode;
+
+  void _onFileSelected(FileNode node) {
+    setState(() {
+      _activeFileNode = node;
+    });
+  }
+
+  void _closeEditor() {
+    setState(() {
+      _activeFileNode = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth >= kTabletBreakpoint;
+
+        // On phone, if an active file is open, show editor full-screen
+        if (!isTablet && _activeFileNode != null) {
+          return EditorView(
+            fileNode: _activeFileNode!,
+            contentRepository: widget.contentRepository,
+            onClose: _closeEditor,
+          );
+        }
+
         return Scaffold(
           appBar: _selectedProject != null
               ? null
@@ -57,11 +83,61 @@ class _AppShellState extends State<AppShell> {
                   ],
                 ),
           body: _selectedProject != null
-              ? WorkspaceView(
-                  project: _selectedProject!,
-                  workspaceRepository: widget.workspaceRepository,
-                  onBack: () => setState(() => _selectedProject = null),
-                )
+              ? isTablet
+                  ? Row(
+                      children: [
+                        SizedBox(
+                          width: 320,
+                          child: WorkspaceView(
+                            project: _selectedProject!,
+                            workspaceRepository: widget.workspaceRepository,
+                            onFileSelected: _onFileSelected,
+                            onBack: () => setState(() {
+                              _selectedProject = null;
+                              _activeFileNode = null;
+                            }),
+                          ),
+                        ),
+                        const VerticalDivider(thickness: 1, width: 1),
+                        Expanded(
+                          child: _activeFileNode != null
+                              ? EditorView(
+                                  key: ValueKey(_activeFileNode!.id.value),
+                                  fileNode: _activeFileNode!,
+                                  contentRepository: widget.contentRepository,
+                                  onClose: _closeEditor,
+                                )
+                              : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.code,
+                                        size: 64,
+                                        color: Theme.of(context).colorScheme.outline,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'Select a file from the workspace to edit',
+                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ],
+                    )
+                  : WorkspaceView(
+                      project: _selectedProject!,
+                      workspaceRepository: widget.workspaceRepository,
+                      onFileSelected: _onFileSelected,
+                      onBack: () => setState(() {
+                        _selectedProject = null;
+                        _activeFileNode = null;
+                      }),
+                    )
               : isTablet
                   ? _TabletLayout(
                       selectedIndex: _selectedIndex,
