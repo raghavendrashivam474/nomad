@@ -4,8 +4,15 @@ import 'package:uuid/uuid.dart';
 
 class ProjectsView extends StatefulWidget {
   final ProjectRepository repository;
+  final WorkspaceRepository? workspaceRepository;
+  final ValueChanged<Project>? onProjectSelected;
 
-  const ProjectsView({super.key, required this.repository});
+  const ProjectsView({
+    super.key,
+    required this.repository,
+    this.workspaceRepository,
+    this.onProjectSelected,
+  });
 
   @override
   State<ProjectsView> createState() => _ProjectsViewState();
@@ -115,6 +122,9 @@ class _ProjectsViewState extends State<ProjectsView> {
 
   Future<void> _deleteProject(EntityId id) async {
     await widget.repository.deleteProject(id);
+    if (widget.workspaceRepository != null) {
+      await widget.workspaceRepository!.deleteAllNodesForProject(id);
+    }
     await _loadProjects();
   }
 
@@ -154,6 +164,7 @@ class _ProjectsViewState extends State<ProjectsView> {
                     final project = _projects[index];
                     final isWeb = project.type == ProjectType.web;
                     return ListTile(
+                      key: Key('project_item_${project.name}'),
                       leading: CircleAvatar(
                         child: Icon(isWeb ? Icons.language : Icons.android),
                       ),
@@ -162,9 +173,11 @@ class _ProjectsViewState extends State<ProjectsView> {
                         isWeb ? 'Type: Web' : 'Type: Android',
                       ),
                       trailing: IconButton(
+                        key: Key('delete_project_${project.name}'),
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () => _deleteProject(project.id),
                       ),
+                      onTap: () => widget.onProjectSelected?.call(project),
                     );
                   },
                 ),

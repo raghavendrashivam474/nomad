@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_mobile/app/nomad_app.dart';
 import 'package:nomad_mobile/data/database/app_database.dart';
 import 'package:nomad_mobile/data/repositories/local_project_repository.dart';
+import 'package:nomad_mobile/data/repositories/local_workspace_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -10,20 +11,21 @@ void main() {
   sqfliteFfiInit();
 
   late Database db;
-  late LocalProjectRepository repository;
+  late LocalProjectRepository projectRepo;
+  late LocalWorkspaceRepository workspaceRepo;
 
   setUp(() async {
     final dbFactory = databaseFactoryFfi;
     db = await dbFactory.openDatabase(inMemoryDatabasePath);
     await AppDatabase.createSchema(db);
-    repository = LocalProjectRepository(dbProvider: () async => db);
+    projectRepo = LocalProjectRepository(dbProvider: () async => db);
+    workspaceRepo = LocalWorkspaceRepository(dbProvider: () async => db);
   });
 
   tearDown(() async {
     await db.close();
   });
 
-  /// Yields across multiple isolate and frame turns to ensure chained async DB calls settle.
   Future<void> settleDb(WidgetTester tester) async {
     for (int i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -39,7 +41,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(NomadApp(repository: repository));
+    await tester.pumpWidget(NomadApp(repository: projectRepo, workspaceRepository: workspaceRepo));
     await settleDb(tester);
 
     expect(find.text('Nomad'), findsWidgets);
@@ -53,7 +55,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(NomadApp(repository: repository));
+    await tester.pumpWidget(NomadApp(repository: projectRepo, workspaceRepository: workspaceRepo));
     await settleDb(tester);
 
     expect(find.text('Tablet View'), findsOneWidget);
@@ -62,46 +64,129 @@ void main() {
     expect(find.text('Projects'), findsOneWidget);
   });
 
-  testWidgets('End-to-End: Create project -> Restart app -> Project persists', (WidgetTester tester) async {
+  testWidgets('End-to-End S0.0.3: Create project -> Restart app -> Project persists', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    // 1. Launch Nomad
-    await tester.pumpWidget(NomadApp(repository: repository));
+    await tester.pumpWidget(NomadApp(repository: projectRepo, workspaceRepository: workspaceRepo));
     await settleDb(tester);
 
-    // 2. Tap "Get Started" to navigate to Projects view
     await tester.tap(find.byKey(const Key('get_started_button')));
     await settleDb(tester);
     expect(find.text('No projects yet'), findsOneWidget);
 
-    // 3. Tap "+ New Project" FAB
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
 
-    // 4. Enter Project Name
     await tester.enterText(find.byKey(const Key('project_name_input')), 'My Website');
     await tester.pump(const Duration(milliseconds: 50));
 
-    // 5. Submit creation
     await tester.tap(find.byKey(const Key('save_project_button')));
     await settleDb(tester);
 
-    // 6. Verify project appears in list
     expect(find.text('My Website'), findsOneWidget);
     expect(find.text('Type: Web'), findsOneWidget);
 
-    // 7. SIMULATE COLD APP RESTART: fresh NomadApp with unique key on same persistent database
-    await tester.pumpWidget(NomadApp(key: UniqueKey(), repository: repository));
+    // Restart app
+    await tester.pumpWidget(NomadApp(key: UniqueKey(), repository: projectRepo, workspaceRepository: workspaceRepo));
     await settleDb(tester);
 
-    // 8. Open Projects tab after fresh launch
     await tester.tap(find.byKey(const Key('get_started_button')));
     await settleDb(tester);
 
-    // 9. PROOF: Previously created project survived the restart!
     expect(find.text('My Website'), findsOneWidget);
     expect(find.text('Type: Web'), findsOneWidget);
+  });
+
+  testWidgets('End-to-End S0.0.4: Open Project -> Workspace File & Folder lifecycle -> Persist across restart', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    // 1. Launch & navigate to Projects
+    await tester.pumpWidget(NomadApp(repository: projectRepo, workspaceRepository: workspaceRepo));
+    await settleDb(tester);
+    await tester.tap(find.byKey(const Key('get_started_button')));
+    await settleDb(tester);
+
+    // 2. Create "Portfolio" project
+    await tester.tap(find.byKey(const Key('add_project_fab')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('project_name_input')), 'Portfolio');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_project_button')));
+    await settleDb(tester);
+
+    // 3. Open the "Portfolio" project workspace
+    await tester.tap(find.text('Portfolio'));
+    await settleDb(tester);
+
+    expect(find.text('Portfolio'), findsOneWidget);
+    expect(find.text('Workspace Root'), findsOneWidget);
+    expect(find.text('Workspace is empty'), findsOneWidget);
+
+    // 4. Create "assets" folder
+    await tester.tap(find.byKey(const Key('add_folder_button')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('node_name_input')), 'assets');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_node_button')));
+    await settleDb(tester);
+
+    // 5. Create "index.html" file
+    await tester.tap(find.byKey(const Key('add_file_button')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('node_name_input')), 'index.html');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_node_button')));
+    await settleDb(tester);
+
+    expect(find.text('assets'), findsOneWidget);
+    expect(find.text('index.html'), findsOneWidget);
+
+    // 6. Drill down into "assets" folder
+    await tester.tap(find.text('assets'));
+    await settleDb(tester);
+
+    expect(find.text('/ assets'), findsOneWidget);
+    expect(find.text('.. (Go up)'), findsOneWidget);
+
+    // 7. Create "logo.svg" inside "assets"
+    await tester.tap(find.byKey(const Key('add_file_button')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('node_name_input')), 'logo.svg');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_node_button')));
+    await settleDb(tester);
+    expect(find.text('logo.svg'), findsOneWidget);
+
+    // 8. Navigate back up to root
+    await tester.tap(find.byKey(const Key('navigate_up_tile')));
+    await settleDb(tester);
+    expect(find.text('Workspace Root'), findsOneWidget);
+
+    // 9. Go back to projects list
+    await tester.tap(find.byKey(const Key('workspace_back_button')));
+    await settleDb(tester);
+    expect(find.text('Portfolio'), findsOneWidget);
+
+    // 10. RESTART APP & VERIFY PERSISTENCE
+    await tester.pumpWidget(NomadApp(key: UniqueKey(), repository: projectRepo, workspaceRepository: workspaceRepo));
+    await settleDb(tester);
+    await tester.tap(find.byKey(const Key('get_started_button')));
+    await settleDb(tester);
+
+    await tester.tap(find.text('Portfolio'));
+    await settleDb(tester);
+
+    // Root nodes persisted
+    expect(find.text('assets'), findsOneWidget);
+    expect(find.text('index.html'), findsOneWidget);
+
+    // Child nodes persisted
+    await tester.tap(find.text('assets'));
+    await settleDb(tester);
+    expect(find.text('logo.svg'), findsOneWidget);
   });
 }

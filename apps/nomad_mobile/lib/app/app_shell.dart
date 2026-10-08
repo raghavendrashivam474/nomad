@@ -1,13 +1,19 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../ui/projects_view.dart';
+import '../ui/workspace_view.dart';
 
 const double kTabletBreakpoint = 600.0;
 
 class AppShell extends StatefulWidget {
   final ProjectRepository repository;
+  final WorkspaceRepository workspaceRepository;
 
-  const AppShell({super.key, required this.repository});
+  const AppShell({
+    super.key,
+    required this.repository,
+    required this.workspaceRepository,
+  });
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -15,6 +21,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  Project? _selectedProject;
 
   @override
   Widget build(BuildContext context) {
@@ -22,43 +29,57 @@ class _AppShellState extends State<AppShell> {
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth >= kTabletBreakpoint;
         return Scaffold(
-          appBar: AppBar(
-            title: Text(_selectedIndex == 0 ? 'Nomad' : 'Projects'),
-            centerTitle: !isTablet,
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      isTablet ? 'Tablet View' : 'Phone View',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.bold,
+          appBar: _selectedProject != null
+              ? null
+              : AppBar(
+                  title: Text(_selectedIndex == 0 ? 'Nomad' : 'Projects'),
+                  centerTitle: !isTablet,
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: Text(
+                            isTablet ? 'Tablet View' : 'Phone View',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          body: isTablet
-              ? _TabletLayout(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
-                  repository: widget.repository,
+          body: _selectedProject != null
+              ? WorkspaceView(
+                  project: _selectedProject!,
+                  workspaceRepository: widget.workspaceRepository,
+                  onBack: () => setState(() => _selectedProject = null),
                 )
-              : _selectedIndex == 0
-                  ? _PhoneHomeLayout(
-                      onOpenProjects: () => setState(() => _selectedIndex = 1),
+              : isTablet
+                  ? _TabletLayout(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+                      repository: widget.repository,
+                      workspaceRepository: widget.workspaceRepository,
+                      onProjectSelected: (project) => setState(() => _selectedProject = project),
                     )
-                  : ProjectsView(repository: widget.repository),
-          bottomNavigationBar: isTablet
+                  : _selectedIndex == 0
+                      ? _PhoneHomeLayout(
+                          onOpenProjects: () => setState(() => _selectedIndex = 1),
+                        )
+                      : ProjectsView(
+                          repository: widget.repository,
+                          workspaceRepository: widget.workspaceRepository,
+                          onProjectSelected: (project) => setState(() => _selectedProject = project),
+                        ),
+          bottomNavigationBar: (isTablet || _selectedProject != null)
               ? null
               : NavigationBar(
                   selectedIndex: _selectedIndex,
@@ -138,11 +159,15 @@ class _TabletLayout extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final ProjectRepository repository;
+  final WorkspaceRepository workspaceRepository;
+  final ValueChanged<Project> onProjectSelected;
 
   const _TabletLayout({
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.repository,
+    required this.workspaceRepository,
+    required this.onProjectSelected,
   });
 
   @override
@@ -208,7 +233,11 @@ class _TabletLayout extends StatelessWidget {
                       ),
                     ),
                   )
-                : ProjectsView(repository: repository),
+                : ProjectsView(
+                    repository: repository,
+                    workspaceRepository: workspaceRepository,
+                    onProjectSelected: onProjectSelected,
+                  ),
           ),
         ],
       ),
