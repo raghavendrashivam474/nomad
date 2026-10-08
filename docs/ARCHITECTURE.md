@@ -28,16 +28,23 @@ Future technology shifts (e.g., migrating from local storage to alternative stor
 - `nomad_core`: Pure Dart domain primitives, entities, contracts, and exceptions. Zero Flutter UI dependencies.
 - `nomad_mobile`: Presentation layer, responsive layouts, device interactions, and state binding.
 
+
 ```text
 ┌───────────────────────────────────────────────┐
 │                 nomad_mobile                  │
 │       (Flutter UI / Responsive Shell)         │
-└───────────────────────┬───────────────────────┘
-                        │
-                        ▼  (Contracts & Primitives)
+│  ┌─────────────────────────────────────────┐  │
+│  │  Infrastructure (LocalProjectRepository │  │
+│  │  + SQLite/sqflite persistence)          │  │
+│  └──────────────────┬──────────────────────┘  │
+└─────────────────────┼─────────────────────────┘
+                      │
+                      ▼  (Contracts & Primitives)
 ┌───────────────────────────────────────────────┐
 │                  nomad_core                   │
 │          (Pure Dart Domain Logic)             │
+│  Project · ProjectType · ProjectRepository    │
+│  EntityId · NomadException                    │
 └───────────────────────────────────────────────┘
 ```
 
@@ -66,8 +73,8 @@ nomad/
 
 ## 5. Sprint Evolution Roadmap
 
-- **S0.0.1 (Current)**: Repository & Application Foundation, Responsive App Shell.
-- **S0.0.2**: Project Domain Model (Project, ProjectType, metadata).
-- **S0.0.3**: Local Persistence & Storage Contracts.
-- **S0.0.4**: File Explorer & Virtual Workspace.
+- **S0.0.1** ✅: Repository & Application Foundation, Responsive App Shell.
+- **S0.0.2** ✅: Project Domain Model (Project, ProjectType, EntityId, invariants).
+- **S0.0.3** ✅: Local Persistence & Storage Contracts (SQLite/sqflite, ProjectRepository, ProjectMapper).
+- **S0.0.4 (Current)**: File Explorer & Virtual Workspace.
 - **S0.0.5**: Mobile Editor Foundation.
