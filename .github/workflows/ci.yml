@@ -1,0 +1,46 @@
+﻿name: CI Baseline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify-core:
+    name: Verify nomad_core (Pure Dart)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Install dependencies
+        working-directory: packages/nomad_core
+        run: dart pub get
+      - name: Analyze
+        working-directory: packages/nomad_core
+        run: dart analyze --fatal-infos
+      - name: Run tests
+        working-directory: packages/nomad_core
+        run: dart test
+
+  verify-mobile:
+    name: Verify nomad_mobile (Flutter Android)
+    runs-on: ubuntu-latest
+    needs: verify-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: Install dependencies
+        working-directory: apps/nomad_mobile
+        run: flutter pub get
+      - name: Analyze
+        working-directory: apps/nomad_mobile
+        run: flutter analyze --fatal-infos
+      - name: Run tests
+        working-directory: apps/nomad_mobile
+        run: flutter test
