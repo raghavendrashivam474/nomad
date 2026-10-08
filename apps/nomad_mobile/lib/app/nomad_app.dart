@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:nomad_core/nomad_core.dart';
+import '../data/repositories/local_project_repository.dart';
 import 'app_shell.dart';
 
 class NomadApp extends StatelessWidget {
-  const NomadApp({super.key});
+  final ProjectRepository? repository;
+
+  const NomadApp({super.key, this.repository});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +28,9 @@ class NomadApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const AppShell(),
+      home: AppShell(
+        repository: repository ?? LocalProjectRepository(),
+      ),
     );
   }
 }

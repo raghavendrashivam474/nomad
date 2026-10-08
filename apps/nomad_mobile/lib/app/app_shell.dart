@@ -1,10 +1,20 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:nomad_core/nomad_core.dart';
+import '../ui/projects_view.dart';
 
-/// Screen width breakpoint separating phone (compact) from tablet (expanded) layout.
 const double kTabletBreakpoint = 600.0;
 
-class AppShell extends StatelessWidget {
-  const AppShell({super.key});
+class AppShell extends StatefulWidget {
+  final ProjectRepository repository;
+
+  const AppShell({super.key, required this.repository});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -13,15 +23,14 @@ class AppShell extends StatelessWidget {
         final isTablet = constraints.maxWidth >= kTabletBreakpoint;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Nomad'),
+            title: Text(_selectedIndex == 0 ? 'Nomad' : 'Projects'),
             centerTitle: !isTablet,
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 16.0),
                 child: Center(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -29,9 +38,7 @@ class AppShell extends StatelessWidget {
                     child: Text(
                       isTablet ? 'Tablet View' : 'Phone View',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.bold,
                           ),
                     ),
@@ -40,15 +47,47 @@ class AppShell extends StatelessWidget {
               ),
             ],
           ),
-          body: isTablet ? const _TabletLayout() : const _PhoneLayout(),
+          body: isTablet
+              ? _TabletLayout(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+                  repository: widget.repository,
+                )
+              : _selectedIndex == 0
+                  ? _PhoneHomeLayout(
+                      onOpenProjects: () => setState(() => _selectedIndex = 1),
+                    )
+                  : ProjectsView(repository: widget.repository),
+          bottomNavigationBar: isTablet
+              ? null
+              : NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+                  destinations: const [
+                    NavigationDestination(
+                      key: Key('nav_lab'),
+                      icon: Icon(Icons.terminal_outlined),
+                      selectedIcon: Icon(Icons.terminal),
+                      label: 'Lab',
+                    ),
+                    NavigationDestination(
+                      key: Key('nav_projects'),
+                      icon: Icon(Icons.folder_outlined),
+                      selectedIcon: Icon(Icons.folder),
+                      label: 'Projects',
+                    ),
+                  ],
+                ),
         );
       },
     );
   }
 }
 
-class _PhoneLayout extends StatelessWidget {
-  const _PhoneLayout();
+class _PhoneHomeLayout extends StatelessWidget {
+  final VoidCallback onOpenProjects;
+
+  const _PhoneHomeLayout({required this.onOpenProjects});
 
   @override
   Widget build(BuildContext context) {
@@ -82,14 +121,8 @@ class _PhoneLayout extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               FilledButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Nomad Core Foundation Ready (S0.0.1)'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                key: const Key('get_started_button'),
+                onPressed: onOpenProjects,
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: const Text('Get Started'),
               ),
@@ -102,17 +135,24 @@ class _PhoneLayout extends StatelessWidget {
 }
 
 class _TabletLayout extends StatelessWidget {
-  const _TabletLayout();
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final ProjectRepository repository;
+
+  const _TabletLayout({
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    required this.repository,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Row(
         children: [
-          // Sidebar Shell Placeholder for tablet foundation
           NavigationRail(
-            selectedIndex: 0,
-            onDestinationSelected: (_) {},
+            selectedIndex: selectedIndex,
+            onDestinationSelected: onDestinationSelected,
             labelType: NavigationRailLabelType.all,
             destinations: const [
               NavigationRailDestination(
@@ -128,56 +168,47 @@ class _TabletLayout extends StatelessWidget {
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
-          // Main Content
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.devices_rounded,
-                      size: 96,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Nomad — Mobile-First Development Lab',
-                      textAlign: TextAlign.center,
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Responsive Tablet Foundation Active',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+            child: selectedIndex == 0
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.devices_rounded,
+                            size: 96,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
-                    ),
-                    const SizedBox(height: 32),
-                    FilledButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('Nomad Tablet Foundation Active (S0.0.1)'),
-                            duration: Duration(seconds: 2),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Nomad — Mobile-First Development Lab',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.explore_rounded),
-                      label: const Text('Explore Workspace'),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Responsive Tablet Foundation Active',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 32),
+                          FilledButton.icon(
+                            onPressed: () => onDestinationSelected(1),
+                            icon: const Icon(Icons.explore_rounded),
+                            label: const Text('Explore Workspace'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  )
+                : ProjectsView(repository: repository),
           ),
         ],
       ),
