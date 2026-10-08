@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
+import '../branding/nomad_brand.dart';
 
 class ProjectsView extends StatefulWidget {
   final ProjectRepository repository;
@@ -48,7 +49,13 @@ class _ProjectsViewState extends State<ProjectsView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Create Project'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
+              ),
+              title: const Text(
+                'Create Project',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: SizedBox(
                 width: 320,
                 child: Column(
@@ -61,15 +68,18 @@ class _ProjectsViewState extends State<ProjectsView> {
                       decoration: const InputDecoration(
                         labelText: 'Project Name',
                         hintText: 'e.g. My Website',
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: NomadBrand.space16),
                     DropdownButtonFormField<ProjectType>(
                       // ignore: deprecated_member_use
                       value: selectedType,
                       isExpanded: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Project Type'),
+                      decoration: const InputDecoration(
+                        labelText: 'Project Type',
+                        border: OutlineInputBorder(),
+                      ),
                       items: ProjectType.values.map((type) {
                         return DropdownMenuItem(
                           value: type,
@@ -138,51 +148,78 @@ class _ProjectsViewState extends State<ProjectsView> {
           ? const Center(child: CircularProgressIndicator())
           : _projects.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.folder_open_outlined,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No projects yet',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Create a project to get started',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(NomadBrand.space32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.folder_open_outlined,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: NomadBrand.space16),
+                        Text(
+                          'No projects yet',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: NomadBrand.space8),
+                        Text(
+                          'Create your first project and start building.',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
-              : ListView.builder(
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: NomadBrand.space16,
+                    vertical: NomadBrand.space12,
+                  ),
                   itemCount: _projects.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: NomadBrand.space8),
                   itemBuilder: (context, index) {
                     final project = _projects[index];
                     final isWeb = project.type == ProjectType.web;
-                    return ListTile(
-                      key: Key('project_item_${project.name}'),
-                      leading: CircleAvatar(
-                        child: Icon(isWeb ? Icons.language : Icons.android),
+                    return Card(
+                      child: ListTile(
+                        key: Key('project_item_${project.name}'),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(NomadBrand.radiusMedium),
+                        ),
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
+                          child: Icon(isWeb ? Icons.language : Icons.android),
+                        ),
+                        title: Text(
+                          project.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          isWeb ? 'Type: Web' : 'Type: Android',
+                        ),
+                        trailing: IconButton(
+                          key: Key('delete_project_${project.name}'),
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _deleteProject(project.id),
+                        ),
+                        onTap: () => widget.onProjectSelected?.call(project),
                       ),
-                      title: Text(project.name),
-                      subtitle: Text(
-                        isWeb ? 'Type: Web' : 'Type: Android',
-                      ),
-                      trailing: IconButton(
-                        key: Key('delete_project_${project.name}'),
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _deleteProject(project.id),
-                      ),
-                      onTap: () => widget.onProjectSelected?.call(project),
                     );
                   },
                 ),

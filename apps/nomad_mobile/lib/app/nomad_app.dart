@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../branding/nomad_brand.dart';
 import '../data/repositories/local_file_content_repository.dart';
 import '../data/repositories/local_project_repository.dart';
 import '../data/repositories/local_workspace_repository.dart';
@@ -20,22 +21,10 @@ class NomadApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nomad',
+      title: NomadBrand.productName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E88E5),
-          brightness: Brightness.light,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E88E5),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: NomadBrand.lightTheme(),
+      darkTheme: NomadBrand.darkTheme(),
       themeMode: ThemeMode.system,
       home: AppShell(
         repository: repository ?? LocalProjectRepository(),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../branding/nomad_brand.dart';
+import '../branding/nomad_logo_widget.dart';
 import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
 import '../ui/workspace_view.dart';
@@ -82,8 +84,20 @@ class _AppShellState extends State<AppShell> {
           appBar: _selectedProject != null
               ? null
               : AppBar(
-                  title: Text(_selectedIndex == 0 ? 'Nomad' : 'Projects'),
-                  centerTitle: !isTablet,
+                  title: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const NomadLogo(size: 24, showBorder: true),
+                      const SizedBox(width: 8),
+                      Text(
+                        _selectedIndex == 0
+                            ? NomadBrand.productName
+                            : 'Projects',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  centerTitle: false,
                   actions: [
                     Padding(
                       padding: const EdgeInsets.only(right: 16.0),
@@ -321,32 +335,29 @@ class _PhoneHomeLayout extends StatelessWidget {
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(NomadBrand.space24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(
-                Icons.terminal_rounded,
-                size: 72,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
+              const NomadLogo(size: 96, showBorder: true),
+              const SizedBox(height: NomadBrand.space24),
               Text(
-                'Nomad',
+                NomadBrand.productName,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: NomadBrand.space8),
               Text(
-                'Development. Everywhere You Go.',
+                NomadBrand.subTagline,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: NomadBrand.space32),
               FilledButton.icon(
                 key: const Key('get_started_button'),
                 onPressed: onOpenProjects,
@@ -384,6 +395,10 @@ class _TabletLayout extends StatelessWidget {
           NavigationRail(
             selectedIndex: selectedIndex,
             onDestinationSelected: onDestinationSelected,
+            leading: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: NomadLogo(size: 40, showBorder: true),
+            ),
             labelType: NavigationRailLabelType.all,
             destinations: const [
               NavigationRailDestination(
@@ -403,19 +418,15 @@ class _TabletLayout extends StatelessWidget {
             child: selectedIndex == 0
                 ? Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(NomadBrand.space32),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.devices_rounded,
-                            size: 96,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(height: 24),
+                          const NomadLogo(size: 112, showBorder: true),
+                          const SizedBox(height: NomadBrand.space24),
                           Text(
-                            'Nomad — Mobile-First Development Lab',
+                            '${NomadBrand.productName} — ${NomadBrand.tagline}',
                             textAlign: TextAlign.center,
                             style: Theme.of(context)
                                 .textTheme
@@ -424,7 +435,7 @@ class _TabletLayout extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: NomadBrand.space12),
                           Text(
                             'Responsive Tablet Foundation Active',
                             textAlign: TextAlign.center,
@@ -437,7 +448,7 @@ class _TabletLayout extends StatelessWidget {
                                       .onSurfaceVariant,
                                 ),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: NomadBrand.space32),
                           FilledButton.icon(
                             onPressed: () => onDestinationSelected(1),
                             icon: const Icon(Icons.explore_rounded),

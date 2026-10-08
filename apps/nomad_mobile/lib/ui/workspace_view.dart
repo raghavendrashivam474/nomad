@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
+import '../branding/nomad_brand.dart';
 
 class WorkspaceView extends StatefulWidget {
   final Project project;
@@ -75,7 +76,13 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isFolder ? 'New Folder' : 'New File'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
+        ),
+        title: Text(
+          isFolder ? 'New Folder' : 'New File',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: TextField(
           key: const Key('node_name_input'),
           controller: nameController,
@@ -83,6 +90,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
           decoration: InputDecoration(
             labelText: isFolder ? 'Folder Name' : 'File Name',
             hintText: isFolder ? 'e.g. assets' : 'e.g. index.html',
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -128,13 +136,20 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Rename ${node.isFolder ? "Folder" : "File"}'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
+        ),
+        title: Text(
+          'Rename ${node.isFolder ? "Folder" : "File"}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: TextField(
           key: const Key('rename_node_input'),
           controller: nameController,
           autofocus: true,
           decoration: const InputDecoration(
             labelText: 'New Name',
+            border: OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -228,32 +243,38 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                 Expanded(
                   child: currentNodes.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.folder_open_outlined,
-                                size: 56,
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Workspace is empty',
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tap + above to create files or folders',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                              ),
-                            ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(NomadBrand.space32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder_open_outlined,
+                                  size: 56,
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                                const SizedBox(height: NomadBrand.space12),
+                                Text(
+                                  'Workspace is empty',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: NomadBrand.space4),
+                                Text(
+                                  'Tap + above to create files or folders',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.separated(

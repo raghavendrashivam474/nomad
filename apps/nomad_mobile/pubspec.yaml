@@ -1,4 +1,4 @@
-﻿name: nomad_mobile
+name: nomad_mobile
 description: Nomad — Mobile-First Development Lab application.
 version: 0.0.1+1
 publish_to: 'none'
@@ -24,3 +24,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/
