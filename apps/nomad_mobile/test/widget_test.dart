@@ -47,7 +47,7 @@ void main() {
     }
   }
 
-  testWidgets('App renders Phone layout on narrow screens', (WidgetTester tester) async {
+  testWidgets('App renders Phone layout on narrow screens (390x844)', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -65,7 +65,7 @@ void main() {
     expect(find.text('Get Started'), findsOneWidget);
   });
 
-  testWidgets('App renders Tablet layout on wide screens', (WidgetTester tester) async {
+  testWidgets('App renders Tablet layout on wide screens (1024x768)', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1024, 768);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -193,7 +193,7 @@ void main() {
     expect(find.text('index.html'), findsOneWidget);
   });
 
-  testWidgets('End-to-End S0.0.5: Open File -> Edit Code -> Save -> Restart App -> Code Persists', (WidgetTester tester) async {
+  testWidgets('End-to-End S0.0.5: Phone flow - Open File -> Edit Code -> Save -> Restart App -> Code Persists', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -274,5 +274,87 @@ void main() {
 
     // 11. PROOF: File content survived app restart!
     expect(find.text(htmlSnippet), findsOneWidget);
+  });
+
+  testWidgets('End-to-End S0.0.6: Tablet flow - Split-Pane Workspace with Multi-File Tabs & Editing', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    // 1. Launch in Tablet View
+    await tester.pumpWidget(NomadApp(
+      repository: projectRepo,
+      workspaceRepository: workspaceRepo,
+      contentRepository: contentRepo,
+    ));
+    await settleDb(tester);
+
+    // 2. Open Projects via Rail
+    await tester.tap(find.text('Projects'));
+    await settleDb(tester);
+
+    // 3. Create Project "Tablet IDE"
+    await tester.tap(find.byKey(const Key('add_project_fab')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('project_name_input')), 'Tablet IDE');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_project_button')));
+    await settleDb(tester);
+
+    // 4. Open "Tablet IDE" workspace
+    await tester.tap(find.text('Tablet IDE'));
+    await settleDb(tester);
+
+    // Verify split layout: placeholder on the right side
+    expect(find.text('Select a file from the workspace to edit'), findsOneWidget);
+
+    // 5. Create two files: index.html and style.css
+    await tester.tap(find.byKey(const Key('add_file_button')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('node_name_input')), 'index.html');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_node_button')));
+    await settleDb(tester);
+
+    await tester.tap(find.byKey(const Key('add_file_button')));
+    await settleDb(tester);
+    await tester.enterText(find.byKey(const Key('node_name_input')), 'style.css');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('save_node_button')));
+    await settleDb(tester);
+
+    // 6. Open "index.html" -> Tab appears & Editor opens
+    await tester.tap(find.byKey(const Key('node_index.html')));
+    await settleDb(tester);
+    expect(find.byKey(const Key('tab_index.html')), findsOneWidget);
+
+    // Edit index.html
+    await tester.enterText(find.byKey(const Key('editor_text_field')), '<h1>Nomad V0.0</h1>');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('editor_save_button')));
+    await settleDb(tester);
+
+    // 7. Open "style.css" -> Second tab appears & active editor switches
+    await tester.tap(find.byKey(const Key('node_style.css')));
+    await settleDb(tester);
+    expect(find.byKey(const Key('tab_index.html')), findsOneWidget);
+    expect(find.byKey(const Key('tab_style.css')), findsOneWidget);
+
+    // Edit style.css
+    await tester.enterText(find.byKey(const Key('editor_text_field')), 'body { background: #000; }');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('editor_save_button')));
+    await settleDb(tester);
+
+    // 8. Switch back to "index.html" tab -> verify content
+    await tester.tap(find.byKey(const Key('tab_index.html')));
+    await settleDb(tester);
+    expect(find.text('<h1>Nomad V0.0</h1>'), findsOneWidget);
+
+    // 9. Close "index.html" tab -> active editor switches to style.css
+    await tester.tap(find.byKey(const Key('close_tab_index.html')));
+    await settleDb(tester);
+    expect(find.byKey(const Key('tab_index.html')), findsNothing);
+    expect(find.text('body { background: #000; }'), findsOneWidget);
   });
 }
