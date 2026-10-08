@@ -1,4 +1,4 @@
-﻿/// Nomad Core domain library.
+/// Nomad Core domain library.
 library nomad_core;
 
 export 'src/errors/nomad_exception.dart';

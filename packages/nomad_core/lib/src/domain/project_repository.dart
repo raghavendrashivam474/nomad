@@ -1,4 +1,4 @@
-﻿import 'project.dart';
+import 'project.dart';
 import '../identifiers/unique_id.dart';
 
 /// Contract boundary for Project persistence.

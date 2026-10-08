@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/data/database/app_database.dart';
 import 'package:nomad_mobile/data/repositories/local_workspace_repository.dart';
@@ -27,7 +27,8 @@ void main() {
     const projectIdA = EntityId('project-a');
     const projectIdB = EntityId('project-b');
 
-    test('can create and list nodes (sorted folder-first, then alphabetically)', () async {
+    test('can create and list nodes (sorted folder-first, then alphabetically)',
+        () async {
       final file1 = FileNode(
         id: const EntityId('f-1'),
         projectId: projectIdA,
@@ -70,8 +71,8 @@ void main() {
 
       // Assert sorting order (Folder first, then files sorted alphabetically)
       expect(nodes[0].id, equals(const EntityId('fol-1'))); // assets (folder)
-      expect(nodes[1].id, equals(const EntityId('f-1')));   // index.html (file)
-      expect(nodes[2].id, equals(const EntityId('f-2')));   // style.css (file)
+      expect(nodes[1].id, equals(const EntityId('f-1'))); // index.html (file)
+      expect(nodes[2].id, equals(const EntityId('f-2'))); // style.css (file)
     });
 
     test('can rename nodes and retrieve by id', () async {
@@ -156,7 +157,8 @@ void main() {
 
       expect(await repository.getNodeById(const EntityId('root-fol')), isNull);
       expect(await repository.getNodeById(const EntityId('child-fol')), isNull);
-      expect(await repository.getNodeById(const EntityId('nested-file')), isNull);
+      expect(
+          await repository.getNodeById(const EntityId('nested-file')), isNull);
     });
 
     test('project isolation is strictly enforced', () async {

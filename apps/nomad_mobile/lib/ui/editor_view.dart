@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
 
@@ -137,8 +137,10 @@ class _EditorViewState extends State<EditorView> {
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _saveContent,
-        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _saveContent,
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+            _saveContent,
+        const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
+            _saveContent,
       },
       child: Focus(
         autofocus: true,
@@ -161,7 +163,8 @@ class _EditorViewState extends State<EditorView> {
                   child: Text(
                     title,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -195,7 +198,9 @@ class _EditorViewState extends State<EditorView> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                            Icon(Icons.error_outline,
+                                size: 48,
+                                color: Theme.of(context).colorScheme.error),
                             const SizedBox(height: 12),
                             Text(_errorMessage!, textAlign: TextAlign.center),
                             const SizedBox(height: 16),

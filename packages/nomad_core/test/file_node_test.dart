@@ -1,13 +1,15 @@
-﻿import 'package:test/test.dart';
+import 'package:test/test.dart';
 import 'package:nomad_core/nomad_core.dart';
 
 void main() {
   group('FileNodeType', () {
     test('has file and folder values', () {
-      expect(FileNodeType.values, containsAll([
-        FileNodeType.file,
-        FileNodeType.folder,
-      ]));
+      expect(
+          FileNodeType.values,
+          containsAll([
+            FileNodeType.file,
+            FileNodeType.folder,
+          ]));
       expect(FileNodeType.values.length, equals(2));
     });
   });

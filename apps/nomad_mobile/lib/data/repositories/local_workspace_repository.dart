@@ -1,4 +1,4 @@
-﻿import 'package:nomad_core/nomad_core.dart';
+import 'package:nomad_core/nomad_core.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import '../mappers/file_node_mapper.dart';
@@ -47,7 +47,9 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<void> renameNode(EntityId id, String newName) async {
-    if (newName.trim().isEmpty || newName.contains('/') || newName.contains('\\')) {
+    if (newName.trim().isEmpty ||
+        newName.contains('/') ||
+        newName.contains('\\')) {
       throw const ContractViolationException('Invalid file name');
     }
 
@@ -81,9 +83,8 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
         whereArgs: frontier,
       );
 
-      final childIds = childRows
-          .map((r) => r[AppDatabase.columnId] as String)
-          .toList();
+      final childIds =
+          childRows.map((r) => r[AppDatabase.columnId] as String).toList();
 
       idsToDelete.addAll(childIds);
       frontier = childIds;

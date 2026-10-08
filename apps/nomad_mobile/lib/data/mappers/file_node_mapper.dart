@@ -1,4 +1,4 @@
-﻿import 'package:nomad_core/nomad_core.dart';
+import 'package:nomad_core/nomad_core.dart';
 import '../database/app_database.dart';
 
 class FileNodeMapper {

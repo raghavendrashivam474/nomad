@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_mobile/app/nomad_app.dart';
@@ -27,7 +27,8 @@ void main() {
 
     projectRepo = LocalProjectRepository(dbProvider: () async => db);
     workspaceRepo = LocalWorkspaceRepository(dbProvider: () async => db);
-    contentRepo = LocalFileContentRepository(baseDirProvider: () async => tempFilesDir);
+    contentRepo =
+        LocalFileContentRepository(baseDirProvider: () async => tempFilesDir);
   });
 
   tearDown(() async {
@@ -47,7 +48,8 @@ void main() {
     }
   }
 
-  testWidgets('App renders Phone layout on narrow screens (390x844)', (WidgetTester tester) async {
+  testWidgets('App renders Phone layout on narrow screens (390x844)',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -65,7 +67,8 @@ void main() {
     expect(find.text('Get Started'), findsOneWidget);
   });
 
-  testWidgets('App renders Tablet layout on wide screens (1024x768)', (WidgetTester tester) async {
+  testWidgets('App renders Tablet layout on wide screens (1024x768)',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1024, 768);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -83,7 +86,9 @@ void main() {
     expect(find.text('Projects'), findsOneWidget);
   });
 
-  testWidgets('End-to-End S0.0.3: Create project -> Restart app -> Project persists', (WidgetTester tester) async {
+  testWidgets(
+      'End-to-End S0.0.3: Create project -> Restart app -> Project persists',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -102,7 +107,8 @@ void main() {
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
 
-    await tester.enterText(find.byKey(const Key('project_name_input')), 'My Website');
+    await tester.enterText(
+        find.byKey(const Key('project_name_input')), 'My Website');
     await tester.pump(const Duration(milliseconds: 50));
 
     await tester.tap(find.byKey(const Key('save_project_button')));
@@ -127,7 +133,9 @@ void main() {
     expect(find.text('Type: Web'), findsOneWidget);
   });
 
-  testWidgets('End-to-End S0.0.4: Open Project -> Workspace File & Folder lifecycle -> Persist across restart', (WidgetTester tester) async {
+  testWidgets(
+      'End-to-End S0.0.4: Open Project -> Workspace File & Folder lifecycle -> Persist across restart',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -144,7 +152,8 @@ void main() {
     // Create "Portfolio" project
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('project_name_input')), 'Portfolio');
+    await tester.enterText(
+        find.byKey(const Key('project_name_input')), 'Portfolio');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
     await settleDb(tester);
@@ -163,7 +172,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('add_file_button')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('node_name_input')), 'index.html');
+    await tester.enterText(
+        find.byKey(const Key('node_name_input')), 'index.html');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_node_button')));
     await settleDb(tester);
@@ -193,7 +203,9 @@ void main() {
     expect(find.text('index.html'), findsOneWidget);
   });
 
-  testWidgets('End-to-End S0.0.5: Phone flow - Open File -> Edit Code -> Save -> Restart App -> Code Persists', (WidgetTester tester) async {
+  testWidgets(
+      'End-to-End S0.0.5: Phone flow - Open File -> Edit Code -> Save -> Restart App -> Code Persists',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -211,7 +223,8 @@ void main() {
     // 2. Create "Web Lab Project"
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('project_name_input')), 'Web Lab Project');
+    await tester.enterText(
+        find.byKey(const Key('project_name_input')), 'Web Lab Project');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
     await settleDb(tester);
@@ -223,7 +236,8 @@ void main() {
     // 4. Create "index.html" file
     await tester.tap(find.byKey(const Key('add_file_button')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('node_name_input')), 'index.html');
+    await tester.enterText(
+        find.byKey(const Key('node_name_input')), 'index.html');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_node_button')));
     await settleDb(tester);
@@ -237,7 +251,8 @@ void main() {
 
     // 6. Type HTML source code
     const htmlSnippet = '<html>\n  <body>\n    Hello Nomad\n  </body>\n</html>';
-    await tester.enterText(find.byKey(const Key('editor_text_field')), htmlSnippet);
+    await tester.enterText(
+        find.byKey(const Key('editor_text_field')), htmlSnippet);
     await tester.pump(const Duration(milliseconds: 50));
 
     // Notice dirty title "index.html *"
@@ -276,7 +291,9 @@ void main() {
     expect(find.text(htmlSnippet), findsOneWidget);
   });
 
-  testWidgets('End-to-End S0.0.6: Tablet flow - Split-Pane Workspace with Multi-File Tabs & Editing', (WidgetTester tester) async {
+  testWidgets(
+      'End-to-End S0.0.6: Tablet flow - Split-Pane Workspace with Multi-File Tabs & Editing',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1024, 768);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -296,7 +313,8 @@ void main() {
     // 3. Create Project "Tablet IDE"
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('project_name_input')), 'Tablet IDE');
+    await tester.enterText(
+        find.byKey(const Key('project_name_input')), 'Tablet IDE');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
     await settleDb(tester);
@@ -306,19 +324,22 @@ void main() {
     await settleDb(tester);
 
     // Verify split layout: placeholder on the right side
-    expect(find.text('Select a file from the workspace to edit'), findsOneWidget);
+    expect(
+        find.text('Select a file from the workspace to edit'), findsOneWidget);
 
     // 5. Create two files: index.html and style.css
     await tester.tap(find.byKey(const Key('add_file_button')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('node_name_input')), 'index.html');
+    await tester.enterText(
+        find.byKey(const Key('node_name_input')), 'index.html');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_node_button')));
     await settleDb(tester);
 
     await tester.tap(find.byKey(const Key('add_file_button')));
     await settleDb(tester);
-    await tester.enterText(find.byKey(const Key('node_name_input')), 'style.css');
+    await tester.enterText(
+        find.byKey(const Key('node_name_input')), 'style.css');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_node_button')));
     await settleDb(tester);
@@ -329,7 +350,8 @@ void main() {
     expect(find.byKey(const Key('tab_index.html')), findsOneWidget);
 
     // Edit index.html
-    await tester.enterText(find.byKey(const Key('editor_text_field')), '<h1>Nomad V0.0</h1>');
+    await tester.enterText(
+        find.byKey(const Key('editor_text_field')), '<h1>Nomad V0.0</h1>');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('editor_save_button')));
     await settleDb(tester);
@@ -341,7 +363,8 @@ void main() {
     expect(find.byKey(const Key('tab_style.css')), findsOneWidget);
 
     // Edit style.css
-    await tester.enterText(find.byKey(const Key('editor_text_field')), 'body { background: #000; }');
+    await tester.enterText(find.byKey(const Key('editor_text_field')),
+        'body { background: #000; }');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('editor_save_button')));
     await settleDb(tester);

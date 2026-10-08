@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
@@ -89,15 +89,22 @@ class _AppShellState extends State<AppShell> {
                       padding: const EdgeInsets.only(right: 16.0),
                       child: Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             isTablet ? 'Tablet View' : 'Phone View',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer,
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
@@ -127,52 +134,77 @@ class _AppShellState extends State<AppShell> {
                               if (_openTabs.isNotEmpty)
                                 Container(
                                   height: 42,
-                                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withAlpha(80),
                                   child: ListView.builder(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: _openTabs.length,
                                     itemBuilder: (context, idx) {
                                       final tab = _openTabs[idx];
-                                      final isActive = _activeFileNode?.id == tab.id;
+                                      final isActive =
+                                          _activeFileNode?.id == tab.id;
                                       return InkWell(
                                         key: Key('tab_${tab.name}'),
-                                        onTap: () => setState(() => _activeFileNode = tab),
+                                        onTap: () => setState(
+                                            () => _activeFileNode = tab),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12),
                                           decoration: BoxDecoration(
                                             color: isActive
-                                                ? Theme.of(context).colorScheme.surface
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .surface
                                                 : Colors.transparent,
                                             border: Border(
                                               bottom: BorderSide(
                                                 color: isActive
-                                                    ? Theme.of(context).colorScheme.primary
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
                                                     : Colors.transparent,
                                                 width: 2,
                                               ),
                                               right: BorderSide(
-                                                color: Theme.of(context).dividerColor.withAlpha(50),
+                                                color: Theme.of(context)
+                                                    .dividerColor
+                                                    .withAlpha(50),
                                               ),
                                             ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.description_outlined, size: 16,
-                                                  color: isActive ? Theme.of(context).colorScheme.primary : null),
+                                              Icon(Icons.description_outlined,
+                                                  size: 16,
+                                                  color: isActive
+                                                      ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                      : null),
                                               const SizedBox(width: 6),
                                               Text(
                                                 tab.name,
                                                 style: TextStyle(
-                                                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                                  color: isActive ? Theme.of(context).colorScheme.primary : null,
+                                                  fontWeight: isActive
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                                  color: isActive
+                                                      ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                      : null,
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
                                               GestureDetector(
-                                                key: Key('close_tab_${tab.name}'),
+                                                key: Key(
+                                                    'close_tab_${tab.name}'),
                                                 onTap: () => _closeTab(tab),
-                                                child: const Icon(Icons.close, size: 14),
+                                                child: const Icon(Icons.close,
+                                                    size: 14),
                                               ),
                                             ],
                                           ),
@@ -184,25 +216,35 @@ class _AppShellState extends State<AppShell> {
                               Expanded(
                                 child: _activeFileNode != null
                                     ? EditorView(
-                                        key: ValueKey(_activeFileNode!.id.value),
+                                        key:
+                                            ValueKey(_activeFileNode!.id.value),
                                         fileNode: _activeFileNode!,
-                                        contentRepository: widget.contentRepository,
+                                        contentRepository:
+                                            widget.contentRepository,
                                         onClose: _closeEditor,
                                       )
                                     : Center(
                                         child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               Icons.code,
                                               size: 64,
-                                              color: Theme.of(context).colorScheme.outline,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline,
                                             ),
                                             const SizedBox(height: 16),
                                             Text(
                                               'Select a file from the workspace to edit',
-                                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.copyWith(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
                                                   ),
                                             ),
                                           ],
@@ -224,25 +266,30 @@ class _AppShellState extends State<AppShell> {
               : isTablet
                   ? _TabletLayout(
                       selectedIndex: _selectedIndex,
-                      onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+                      onDestinationSelected: (idx) =>
+                          setState(() => _selectedIndex = idx),
                       repository: widget.repository,
                       workspaceRepository: widget.workspaceRepository,
-                      onProjectSelected: (project) => setState(() => _selectedProject = project),
+                      onProjectSelected: (project) =>
+                          setState(() => _selectedProject = project),
                     )
                   : _selectedIndex == 0
                       ? _PhoneHomeLayout(
-                          onOpenProjects: () => setState(() => _selectedIndex = 1),
+                          onOpenProjects: () =>
+                              setState(() => _selectedIndex = 1),
                         )
                       : ProjectsView(
                           repository: widget.repository,
                           workspaceRepository: widget.workspaceRepository,
-                          onProjectSelected: (project) => setState(() => _selectedProject = project),
+                          onProjectSelected: (project) =>
+                              setState(() => _selectedProject = project),
                         ),
           bottomNavigationBar: (isTablet || _selectedProject != null)
               ? null
               : NavigationBar(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+                  onDestinationSelected: (idx) =>
+                      setState(() => _selectedIndex = idx),
                   destinations: const [
                     NavigationDestination(
                       key: Key('nav_lab'),
@@ -370,7 +417,10 @@ class _TabletLayout extends StatelessWidget {
                           Text(
                             'Nomad — Mobile-First Development Lab',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
@@ -378,8 +428,13 @@ class _TabletLayout extends StatelessWidget {
                           Text(
                             'Responsive Tablet Foundation Active',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                           ),
                           const SizedBox(height: 32),

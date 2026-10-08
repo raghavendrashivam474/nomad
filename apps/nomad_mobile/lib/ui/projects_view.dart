@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
 
@@ -68,11 +68,14 @@ class _ProjectsViewState extends State<ProjectsView> {
                       // ignore: deprecated_member_use
                       value: selectedType,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Project Type'),
+                      decoration:
+                          const InputDecoration(labelText: 'Project Type'),
                       items: ProjectType.values.map((type) {
                         return DropdownMenuItem(
                           value: type,
-                          child: Text(type == ProjectType.web ? 'Web Application' : 'Android App'),
+                          child: Text(type == ProjectType.web
+                              ? 'Web Application'
+                              : 'Android App'),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -152,7 +155,9 @@ class _ProjectsViewState extends State<ProjectsView> {
                       Text(
                         'Create a project to get started',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],

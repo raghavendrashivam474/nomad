@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../data/repositories/local_file_content_repository.dart';
 import '../data/repositories/local_project_repository.dart';

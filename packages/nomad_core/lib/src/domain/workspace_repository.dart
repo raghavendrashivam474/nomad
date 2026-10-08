@@ -1,4 +1,4 @@
-﻿import '../identifiers/unique_id.dart';
+import '../identifiers/unique_id.dart';
 import 'file_node.dart';
 
 /// Contract boundary for workspace file/folder operations.

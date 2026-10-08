@@ -1,4 +1,4 @@
-﻿import 'package:nomad_core/nomad_core.dart';
+import 'package:nomad_core/nomad_core.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import '../mappers/project_mapper.dart';

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/data/repositories/local_file_content_repository.dart';
@@ -49,7 +49,8 @@ void main() {
 
     test('can delete a specific file content', () async {
       await repository.writeFile(projectIdA, fileId1, 'console.log("hi");');
-      expect(await repository.readFile(projectIdA, fileId1), equals('console.log("hi");'));
+      expect(await repository.readFile(projectIdA, fileId1),
+          equals('console.log("hi");'));
 
       await repository.deleteContent(projectIdA, fileId1);
       expect(await repository.readFile(projectIdA, fileId1), equals(''));
@@ -60,15 +61,18 @@ void main() {
       await repository.writeFile(projectIdB, fileId1, 'content for project B');
 
       // Verify separate contents even with identical file IDs across different projects
-      expect(await repository.readFile(projectIdA, fileId1), equals('content for project A'));
-      expect(await repository.readFile(projectIdB, fileId1), equals('content for project B'));
+      expect(await repository.readFile(projectIdA, fileId1),
+          equals('content for project A'));
+      expect(await repository.readFile(projectIdB, fileId1),
+          equals('content for project B'));
 
       // Delete all content for project A
       await repository.deleteAllContentForProject(projectIdA);
 
       // Project A content is gone, Project B content remains
       expect(await repository.readFile(projectIdA, fileId1), equals(''));
-      expect(await repository.readFile(projectIdB, fileId1), equals('content for project B'));
+      expect(await repository.readFile(projectIdB, fileId1),
+          equals('content for project B'));
     });
   });
 }

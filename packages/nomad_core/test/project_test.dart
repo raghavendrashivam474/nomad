@@ -1,4 +1,4 @@
-﻿import 'package:test/test.dart';
+import 'package:test/test.dart';
 import 'package:nomad_core/nomad_core.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-﻿import '../errors/nomad_exception.dart';
+import '../errors/nomad_exception.dart';
 import '../identifiers/unique_id.dart';
 import 'file_node_type.dart';
 
@@ -63,9 +63,7 @@ class FileNode {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FileNode &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      other is FileNode && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;

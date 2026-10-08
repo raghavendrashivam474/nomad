@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
 
@@ -35,7 +35,8 @@ class _WorkspaceViewState extends State<WorkspaceView> {
   }
 
   Future<void> _loadNodes() async {
-    final nodes = await widget.workspaceRepository.getNodesForProject(widget.project.id);
+    final nodes =
+        await widget.workspaceRepository.getNodesForProject(widget.project.id);
     if (mounted) {
       setState(() {
         _allNodes = nodes;
@@ -45,7 +46,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
   }
 
   List<FileNode> get _currentLevelNodes {
-    return _allNodes.where((node) => node.parentId == _currentFolderId).toList();
+    return _allNodes
+        .where((node) => node.parentId == _currentFolderId)
+        .toList();
   }
 
   void _navigateToFolder(FileNode folder) {
@@ -59,7 +62,8 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     if (_folderBreadcrumbs.isNotEmpty) {
       setState(() {
         _folderBreadcrumbs.removeLast();
-        _currentFolderId = _folderBreadcrumbs.isEmpty ? null : _folderBreadcrumbs.last.id;
+        _currentFolderId =
+            _folderBreadcrumbs.isEmpty ? null : _folderBreadcrumbs.last.id;
       });
     }
   }
@@ -142,7 +146,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
             key: const Key('confirm_rename_button'),
             onPressed: () async {
               final newName = nameController.text.trim();
-              if (newName.isEmpty || newName.contains('/') || newName.contains('\\')) {
+              if (newName.isEmpty ||
+                  newName.contains('/') ||
+                  newName.contains('\\')) {
                 return;
               }
 
@@ -180,7 +186,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.project.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(widget.project.name,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             Text(
               _folderBreadcrumbs.isEmpty
                   ? 'Workspace Root'
@@ -236,8 +244,13 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                               const SizedBox(height: 4),
                               Text(
                                 'Tap + above to create files or folders',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                               ),
                             ],
@@ -253,19 +266,28 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                             return ListTile(
                               key: Key('node_${node.name}'),
                               selected: isSelected,
-                              selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withAlpha(80),
+                              selectedTileColor: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer
+                                  .withAlpha(80),
                               leading: Icon(
-                                node.isFolder ? Icons.folder : Icons.description_outlined,
+                                node.isFolder
+                                    ? Icons.folder
+                                    : Icons.description_outlined,
                                 color: node.isFolder
                                     ? Theme.of(context).colorScheme.primary
                                     : isSelected
                                         ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.secondary,
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
                               ),
                               title: Text(
                                 node.name,
                                 style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                               onTap: () {
@@ -299,9 +321,12 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                                     value: 'delete',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                        Icon(Icons.delete_outline,
+                                            size: 18, color: Colors.red),
                                         SizedBox(width: 8),
-                                        Text('Delete', style: TextStyle(color: Colors.red)),
+                                        Text('Delete',
+                                            style:
+                                                TextStyle(color: Colors.red)),
                                       ],
                                     ),
                                   ),

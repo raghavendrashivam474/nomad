@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -34,7 +34,8 @@ class LocalFileContentRepository implements FileContentRepository {
   }
 
   @override
-  Future<void> writeFile(EntityId projectId, EntityId fileNodeId, String content) async {
+  Future<void> writeFile(
+      EntityId projectId, EntityId fileNodeId, String content) async {
     try {
       final file = await _getFile(projectId, fileNodeId);
       await file.create(recursive: true);

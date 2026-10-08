@@ -1,4 +1,4 @@
-﻿import '../errors/nomad_exception.dart';
+import '../errors/nomad_exception.dart';
 import '../identifiers/unique_id.dart';
 import 'project_type.dart';
 

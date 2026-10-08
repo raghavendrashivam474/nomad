@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/data/database/app_database.dart';
 import 'package:nomad_mobile/data/repositories/local_project_repository.dart';
@@ -83,7 +83,8 @@ void main() {
     });
 
     test('returns null for non-existent project id', () async {
-      final result = await repository.getProjectById(const EntityId('non-existent'));
+      final result =
+          await repository.getProjectById(const EntityId('non-existent'));
       expect(result, isNull);
     });
   });
