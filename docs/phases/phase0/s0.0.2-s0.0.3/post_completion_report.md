@@ -1,26 +1,26 @@
-Here is the formal post-sprint report. You can save this directly to `docs/phases/phase1/S0.0.2-S0.0.3-sprint-report.md`.
+﻿Here is the formal post-sprint report. You can save this directly to `docs/phases/phase0/S0.0.2-S0.0.3-sprint-report.md`.
 
 ---
 
-# Nomad Sprint Report — S0.0.2 + S0.0.3
+# Nomad Sprint Report â€” S0.0.2 + S0.0.3
 
 **Date:** 2025-07-10
-**Sprints:** S0.0.2 (Project Model) → S0.0.3 (Local Storage)
+**Sprints:** S0.0.2 (Project Model) â†’ S0.0.3 (Local Storage)
 **Baseline:** `v0.0.1` (commit `51fde2a`)
 **Branch:** `main`
-**Status:** ✅ Complete
+**Status:** âœ… Complete
 
 ---
 
 ## 1. Executive Summary
 
-Over two consecutive sprints, Nomad gained its first real domain entity (`Project`) and a fully functional local persistence layer backed by SQLite. At the end of S0.0.3, the application can create a project, close, reopen, and find the project still present — the exact acceptance criterion defined in the implementation brief.
+Over two consecutive sprints, Nomad gained its first real domain entity (`Project`) and a fully functional local persistence layer backed by SQLite. At the end of S0.0.3, the application can create a project, close, reopen, and find the project still present â€” the exact acceptance criterion defined in the implementation brief.
 
 All existing S0.0.1 architecture, tests, and boundaries remain intact. No Flutter dependencies were introduced into `nomad_core`. No destructive refactoring was performed on any existing code.
 
 ---
 
-## 2. S0.0.2 — Project Domain Model
+## 2. S0.0.2 â€” Project Domain Model
 
 ### 2.1 What Was Implemented
 
@@ -51,13 +51,13 @@ All existing S0.0.1 architecture, tests, and boundaries remain intact. No Flutte
 ### 2.4 Verification
 
 ```
-dart analyze  → 0 issues
-dart test     → 7/7 passed (4 existing + 3 new)
+dart analyze  â†’ 0 issues
+dart test     â†’ 7/7 passed (4 existing + 3 new)
 ```
 
 ---
 
-## 3. S0.0.3 — Local Storage
+## 3. S0.0.3 â€” Local Storage
 
 ### 3.1 What Was Implemented
 
@@ -93,14 +93,14 @@ No additional columns were added. This matches the brief's explicit instruction 
 
 ```
 nomad_core (pure Dart)
-  └── ProjectRepository (abstract contract)
-        ▲
-        │ implements
-        │
+  â””â”€â”€ ProjectRepository (abstract contract)
+        â–²
+        â”‚ implements
+        â”‚
 nomad_mobile (Flutter + sqflite)
-  └── LocalProjectRepository
-        └── ProjectMapper
-              └── AppDatabase (SQLite)
+  â””â”€â”€ LocalProjectRepository
+        â””â”€â”€ ProjectMapper
+              â””â”€â”€ AppDatabase (SQLite)
 ```
 
 - `nomad_core` has **zero** knowledge of SQLite, Drift, or Flutter.
@@ -111,27 +111,27 @@ nomad_mobile (Flutter + sqflite)
 
 | # | Problem | Severity | Root Cause | Resolution |
 |---|---|---|---|---|
-| 1 | **SQL CREATE TABLE with empty column names** — `CREATE TABLE ( TEXT PRIMARY KEY, TEXT NOT NULL, ... )` | **Critical** | PowerShell double-quoted here-strings (`@" ... "@`) interpolated Dart's `$tableProjects`, `$columnId`, etc. as PowerShell variables (which were `$null`), stripping them from the generated Dart source. | Switched all Dart code generation to single-quoted here-strings (`@' ... '@`) which prevent PowerShell variable interpolation. |
+| 1 | **SQL CREATE TABLE with empty column names** â€” `CREATE TABLE ( TEXT PRIMARY KEY, TEXT NOT NULL, ... )` | **Critical** | PowerShell double-quoted here-strings (`@" ... "@`) interpolated Dart's `$tableProjects`, `$columnId`, etc. as PowerShell variables (which were `$null`), stripping them from the generated Dart source. | Switched all Dart code generation to single-quoted here-strings (`@' ... '@`) which prevent PowerShell variable interpolation. |
 | 2 | **`pumpAndSettle()` timeout** in widget tests | **High** | `ProjectsView` shows a `CircularProgressIndicator` during async DB loading. `pumpAndSettle()` waits for all animations to stop, but `CircularProgressIndicator` is an infinite animation that never settles. | Replaced `pumpAndSettle()` with a custom `settleDb()` helper that performs multiple `pump(duration)` + `tester.runAsync()` cycles to let background isolate DB operations complete without waiting on infinite animations. |
-| 3 | **Background isolate timing** — DB queries returning empty results in tests | **High** | `sqflite_common_ffi` executes queries on a background isolate. Flutter's `WidgetTester.pump()` only advances the widget frame clock; it does not yield to the real Dart event loop where isolate messages are processed. | Added `tester.runAsync(() async { await Future.delayed(...) })` inside the `settleDb()` loop. This yields to the real event loop, allowing the FFI isolate to return query results before the next frame is pumped. |
-| 4 | **Widget state preserved across simulated restart** | **Medium** | Re-pumping `NomadApp(repository: repository)` in a widget test does not destroy existing widget state because Flutter's reconciliation algorithm preserves stateful widgets of the same type and key. The `_selectedIndex` remained at `1` (Projects), so the "Get Started" button was not in the tree. | Added `key: UniqueKey()` to the restarted `NomadApp` instance, forcing Flutter to treat it as an entirely new widget tree — simulating a true cold restart where all state is rebuilt from the persistent database. |
-| 5 | **RenderFlex overflow in dialog** — `DropdownButtonFormField` overflowed by 8.3px | **Medium** | The `DropdownButtonFormField` inside `AlertDialog` exceeded the available horizontal width on the 390px test viewport. | Added `isExpanded: true` to `DropdownButtonFormField` and wrapped the dialog content in `SizedBox(width: 320)`. |
-| 6 | **Flutter deprecation lint** — `value` parameter on `DropdownButtonFormField` | **Low** | Flutter 3.33+ deprecated `value` in favor of `initialValue` on form fields. | Added `// ignore: deprecated_member_use` comment. This maintains compatibility across Flutter versions without forcing a minimum SDK bump. |
-| 7 | **Dart syntax typo** — `.toList>` instead of `.toList()` | **Low** | Manual transcription error during code generation. | Caught immediately by `flutter analyze`. Fixed to `.toList()`. |
+| 3 | **Background isolate timing** â€” DB queries returning empty results in tests | **High** | `sqflite_common_ffi` executes queries on a background isolate. Flutter's `WidgetTester.pump()` only advances the widget frame clock; it does not yield to the real Dart event loop where isolate messages are processed. | Added `tester.runAsync(() async { await Future.delayed(...) })` inside the `settleDb()` loop. This yields to the real event loop, allowing the FFI isolate to return query results before the next frame is pumped. |
+| 4 | **Widget state preserved across simulated restart** | **Medium** | Re-pumping `NomadApp(repository: repository)` in a widget test does not destroy existing widget state because Flutter's reconciliation algorithm preserves stateful widgets of the same type and key. The `_selectedIndex` remained at `1` (Projects), so the "Get Started" button was not in the tree. | Added `key: UniqueKey()` to the restarted `NomadApp` instance, forcing Flutter to treat it as an entirely new widget tree â€” simulating a true cold restart where all state is rebuilt from the persistent database. |
+| 5 | **RenderFlex overflow in dialog** â€” `DropdownButtonFormField` overflowed by 8.3px | **Medium** | The `DropdownButtonFormField` inside `AlertDialog` exceeded the available horizontal width on the 390px test viewport. | Added `isExpanded: true` to `DropdownButtonFormField` and wrapped the dialog content in `SizedBox(width: 320)`. |
+| 6 | **Flutter deprecation lint** â€” `value` parameter on `DropdownButtonFormField` | **Low** | Flutter 3.33+ deprecated `value` in favor of `initialValue` on form fields. | Added `// ignore: deprecated_member_use` comment. This maintains compatibility across Flutter versions without forcing a minimum SDK bump. |
+| 7 | **Dart syntax typo** â€” `.toList>` instead of `.toList()` | **Low** | Manual transcription error during code generation. | Caught immediately by `flutter analyze`. Fixed to `.toList()`. |
 
 ### 3.5 Verification
 
 ```
-dart analyze (nomad_core)     → 0 issues
-dart test (nomad_core)        → 7/7 passed
+dart analyze (nomad_core)     â†’ 0 issues
+dart test (nomad_core)        â†’ 7/7 passed
 
-flutter analyze (nomad_mobile) → 0 issues
-flutter test (nomad_mobile)    → 5/5 passed
-  ├── Phone layout rendering
-  ├── Tablet layout rendering
-  ├── Repository CRUD lifecycle (in-memory SQLite)
-  ├── Repository null-return for missing ID
-  └── End-to-End: Create → Restart → Persist ✅
+flutter analyze (nomad_mobile) â†’ 0 issues
+flutter test (nomad_mobile)    â†’ 5/5 passed
+  â”œâ”€â”€ Phone layout rendering
+  â”œâ”€â”€ Tablet layout rendering
+  â”œâ”€â”€ Repository CRUD lifecycle (in-memory SQLite)
+  â”œâ”€â”€ Repository null-return for missing ID
+  â””â”€â”€ End-to-End: Create â†’ Restart â†’ Persist âœ…
 ```
 
 ---
@@ -140,13 +140,13 @@ flutter test (nomad_mobile)    → 5/5 passed
 
 The following were deliberately excluded per the sprint contract:
 
-- ❌ Editor, file explorer, WebView, runner
-- ❌ Cloud backend, authentication, sync
-- ❌ Android build system or development environment
-- ❌ Project description, owner, cloud ID, repository URL, sync status fields
-- ❌ Drift ORM (raw `sqflite` used per current roadmap)
-- ❌ Dedicated infrastructure package (not yet justified; documented in ADR-0002)
-- ❌ Refactoring of any S0.0.1 code
+- âŒ Editor, file explorer, WebView, runner
+- âŒ Cloud backend, authentication, sync
+- âŒ Android build system or development environment
+- âŒ Project description, owner, cloud ID, repository URL, sync status fields
+- âŒ Drift ORM (raw `sqflite` used per current roadmap)
+- âŒ Dedicated infrastructure package (not yet justified; documented in ADR-0002)
+- âŒ Refactoring of any S0.0.1 code
 
 ---
 
@@ -175,5 +175,5 @@ The foundation is now in place for **File Explorer & Virtual Workspace**. The `P
 ---
 
 **Report prepared by:** Junior Developer (Sprint Execution)
-**Reviewed against:** Nomad Implementation Brief V0.0 Seed — S0.0.2 + S0.0.3
-**Architecture compliance:** ADR-0001 ✅ | ADR-0002 ✅
+**Reviewed against:** Nomad Implementation Brief V0.0 Seed â€” S0.0.2 + S0.0.3
+**Architecture compliance:** ADR-0001 âœ… | ADR-0002 âœ…
