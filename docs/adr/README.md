@@ -7,6 +7,10 @@ This directory documents all significant architectural decisions made within the
 | ADR | Title | Status | Sprint |
 |---|---|:---:|:---:|
 | [ADR-0001](ADR-0001-application-boundaries.md) | Application Boundaries & Monorepo Foundation | **Accepted** | S0.0.1 |
+| [ADR-0002](ADR-0002-project-persistence.md) | Project Domain Persistence & SQLite Strategy | **Accepted** | S0.0.3 |
+| [ADR-0003](ADR-0003-workspace-and-file-model.md) | Workspace and File Hierarchy Domain Model | **Accepted** | S0.0.4 |
+| [ADR-0004](ADR-0004-file-content-storage-and-editor.md) | File Content Persistence & Basic Editor Architecture | **Accepted** | S0.0.5 |
+| [ADR-0005](ADR-0005-responsive-workspace-layout.md) | Responsive Foundation & Multi-File Workspace Layout | **Accepted** | S0.0.6 |
 
 ---
 

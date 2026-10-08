@@ -30,22 +30,32 @@ Future technology shifts (e.g., migrating from local storage to alternative stor
 
 
 ```text
-┌───────────────────────────────────────────────┐
-│                 nomad_mobile                  │
-│       (Flutter UI / Responsive Shell)         │
-│  ┌─────────────────────────────────────────┐  │
-│  │  Infrastructure (LocalProjectRepository │  │
-│  │  + SQLite/sqflite persistence)          │  │
-│  └──────────────────┬──────────────────────┘  │
-└─────────────────────┼─────────────────────────┘
-                      │
-                      ▼  (Contracts & Primitives)
-┌───────────────────────────────────────────────┐
-│                  nomad_core                   │
-│          (Pure Dart Domain Logic)             │
-│  Project · ProjectType · ProjectRepository    │
-│  EntityId · NomadException                    │
-└───────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              nomad_mobile                               │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│                    Flutter UI / Presentation                         │  │
+│    AppShell · ProjectsView · WorkspaceView · EditorView              │  │
+│  └─────────────────────────────────┬─────────────────────────────────┘  │
+│                                    │                                    │
+│  ┌─────────────────────────────────▼─────────────────────────────────┐  │
+│                      Infrastructure & Storage                        │  │
+│  LocalProjectRepository ──► AppDatabase (SQLite / sqflite)           │  │
+│  LocalWorkspaceRepository ──► AppDatabase (file_nodes table)         │  │
+│  LocalFileContentRepository ──► Filesystem (nomad_workspaces/)       │  │
+│  └─────────────────────────────────┬─────────────────────────────────┘  │
+└────────────────────────────────────┼────────────────────────────────────┘
+                                     │
+                                     ▼  (Domain Contracts & Primitives)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                               nomad_core                                │
+│                       (Pure Dart Domain Logic)                          │
+│                                                                         │
+│   Entities & Enums:       Contracts:            Errors & IDs:           │
+│   • Project               • ProjectRepository   • EntityId              │
+│   • ProjectType           • WorkspaceRepository • NomadException        │
+│   • FileNode              • FileContentRepo     • DomainException       │
+│   • FileNodeType                                • ContractViolationEx   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 3. Contract Governance Model
@@ -76,5 +86,6 @@ nomad/
 - **S0.0.1** ✅: Repository & Application Foundation, Responsive App Shell.
 - **S0.0.2** ✅: Project Domain Model (Project, ProjectType, EntityId, invariants).
 - **S0.0.3** ✅: Local Persistence & Storage Contracts (SQLite/sqflite, ProjectRepository, ProjectMapper).
-- **S0.0.4 (Current)**: File Explorer & Virtual Workspace.
-- **S0.0.5**: Mobile Editor Foundation.
+ - **S0.0.4** ✅: File Explorer & Virtual Workspace ("FileNode", "FileNodeType", "WorkspaceRepository", "LocalWorkspaceRepository").
+ - **S0.0.5** ✅: Basic Editor Foundation ("FileContentRepository", "LocalFileContentRepository", "EditorView", save lifecycle).
+ - **S0.0.6** ✅: Responsive Foundation & Multi-File Workspace (phone stack flow, tablet split-pane with multi-file tabs).
