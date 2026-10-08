@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 class WorkspaceView extends StatefulWidget {
   final Project project;
   final WorkspaceRepository workspaceRepository;
+  final EntityId? selectedNodeId;
   final ValueChanged<FileNode>? onFileSelected;
   final VoidCallback? onBack;
 
@@ -12,6 +13,7 @@ class WorkspaceView extends StatefulWidget {
     super.key,
     required this.project,
     required this.workspaceRepository,
+    this.selectedNodeId,
     this.onFileSelected,
     this.onBack,
   });
@@ -246,15 +248,26 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final node = currentNodes[index];
+                            final isSelected = widget.selectedNodeId == node.id;
+
                             return ListTile(
                               key: Key('node_${node.name}'),
+                              selected: isSelected,
+                              selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withAlpha(80),
                               leading: Icon(
                                 node.isFolder ? Icons.folder : Icons.description_outlined,
                                 color: node.isFolder
                                     ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.secondary,
+                                    : isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.secondary,
                               ),
-                              title: Text(node.name),
+                              title: Text(
+                                node.name,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
                               onTap: () {
                                 if (node.isFolder) {
                                   _navigateToFolder(node);
