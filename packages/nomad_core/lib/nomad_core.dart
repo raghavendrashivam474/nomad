@@ -9,3 +9,4 @@ export 'src/domain/project_repository.dart';
 export 'src/domain/file_node_type.dart';
 export 'src/domain/file_node.dart';
 export 'src/domain/workspace_repository.dart';
+export 'src/domain/file_content_repository.dart';
