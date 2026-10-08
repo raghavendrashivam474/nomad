@@ -1,7 +1,8 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_mobile/app/nomad_app.dart';
+import 'package:nomad_mobile/branding/nomad_brand.dart';
 import 'package:nomad_mobile/data/database/app_database.dart';
 import 'package:nomad_mobile/data/repositories/local_file_content_repository.dart';
 import 'package:nomad_mobile/data/repositories/local_project_repository.dart';
@@ -81,7 +82,9 @@ void main() {
     await settleDb(tester);
 
     expect(find.text('Tablet View'), findsOneWidget);
-    expect(find.text('Nomad — Mobile-First Development Lab'), findsOneWidget);
+    expect(
+        find.text('${NomadBrand.productName} — ${NomadBrand.tagline}'),
+        findsOneWidget);
     expect(find.text('Lab'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
   });
@@ -112,6 +115,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     await tester.tap(find.byKey(const Key('save_project_button')));
+    await tester.pumpAndSettle();
     await settleDb(tester);
 
     expect(find.text('My Website'), findsOneWidget);
@@ -156,13 +160,14 @@ void main() {
         find.byKey(const Key('project_name_input')), 'Portfolio');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
+    await tester.pumpAndSettle();
     await settleDb(tester);
 
     // Open "Portfolio"
     await tester.tap(find.text('Portfolio'));
     await settleDb(tester);
 
-    // Create folder & file
+    // Create custom folder & custom file
     await tester.tap(find.byKey(const Key('add_folder_button')));
     await settleDb(tester);
     await tester.enterText(find.byKey(const Key('node_name_input')), 'assets');
@@ -173,13 +178,13 @@ void main() {
     await tester.tap(find.byKey(const Key('add_file_button')));
     await settleDb(tester);
     await tester.enterText(
-        find.byKey(const Key('node_name_input')), 'index.html');
+        find.byKey(const Key('node_name_input')), 'about.html');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_node_button')));
     await settleDb(tester);
 
     expect(find.text('assets'), findsOneWidget);
-    expect(find.text('index.html'), findsOneWidget);
+    expect(find.text('about.html'), findsOneWidget);
 
     // Back to projects
     await tester.tap(find.byKey(const Key('workspace_back_button')));
@@ -200,7 +205,7 @@ void main() {
     await settleDb(tester);
 
     expect(find.text('assets'), findsOneWidget);
-    expect(find.text('index.html'), findsOneWidget);
+    expect(find.text('about.html'), findsOneWidget);
   });
 
   testWidgets(
@@ -220,36 +225,28 @@ void main() {
     await tester.tap(find.byKey(const Key('get_started_button')));
     await settleDb(tester);
 
-    // 2. Create "Web Lab Project"
+    // 2. Create "Web Lab Project" (starter files index.html, style.css, script.js auto-created)
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
     await tester.enterText(
         find.byKey(const Key('project_name_input')), 'Web Lab Project');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
+    await tester.pumpAndSettle();
     await settleDb(tester);
 
     // 3. Open project workspace
     await tester.tap(find.text('Web Lab Project'));
     await settleDb(tester);
 
-    // 4. Create "index.html" file
-    await tester.tap(find.byKey(const Key('add_file_button')));
-    await settleDb(tester);
-    await tester.enterText(
-        find.byKey(const Key('node_name_input')), 'index.html');
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('save_node_button')));
-    await settleDb(tester);
-
-    // 5. Open index.html in Editor
+    // 4. Open auto-generated index.html in Editor
     await tester.tap(find.text('index.html'));
     await settleDb(tester);
 
     expect(find.text('index.html'), findsOneWidget);
     expect(find.byKey(const Key('editor_text_field')), findsOneWidget);
 
-    // 6. Type HTML source code
+    // 5. Type HTML source code
     const htmlSnippet = '<html>\n  <body>\n    Hello Nomad\n  </body>\n</html>';
     await tester.enterText(
         find.byKey(const Key('editor_text_field')), htmlSnippet);
@@ -258,17 +255,17 @@ void main() {
     // Notice dirty title "index.html *"
     expect(find.text('index.html *'), findsOneWidget);
 
-    // 7. Save content
+    // 6. Save content
     await tester.tap(find.byKey(const Key('editor_save_button')));
     await settleDb(tester);
 
-    // 8. Close editor and go back to projects
+    // 7. Close editor and go back to projects
     await tester.tap(find.byKey(const Key('editor_close_button')));
     await settleDb(tester);
     await tester.tap(find.byKey(const Key('workspace_back_button')));
     await settleDb(tester);
 
-    // 9. COLD RESTART NOMAD
+    // 8. COLD RESTART NOMAD
     await tester.pumpWidget(NomadApp(
       key: UniqueKey(),
       repository: projectRepo,
@@ -277,7 +274,7 @@ void main() {
     ));
     await settleDb(tester);
 
-    // 10. Reopen Web Lab Project -> Reopen index.html
+    // 9. Reopen Web Lab Project -> Reopen index.html
     await tester.tap(find.byKey(const Key('get_started_button')));
     await settleDb(tester);
 
@@ -287,7 +284,7 @@ void main() {
     await tester.tap(find.text('index.html'));
     await settleDb(tester);
 
-    // 11. PROOF: File content survived app restart!
+    // 10. PROOF: File content survived app restart!
     expect(find.text(htmlSnippet), findsOneWidget);
   });
 
@@ -310,13 +307,14 @@ void main() {
     await tester.tap(find.text('Projects'));
     await settleDb(tester);
 
-    // 3. Create Project "Tablet IDE"
+    // 3. Create Project "Tablet IDE" (starter files auto-created)
     await tester.tap(find.byKey(const Key('add_project_fab')));
     await settleDb(tester);
     await tester.enterText(
         find.byKey(const Key('project_name_input')), 'Tablet IDE');
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('save_project_button')));
+    await tester.pumpAndSettle();
     await settleDb(tester);
 
     // 4. Open "Tablet IDE" workspace
@@ -327,24 +325,7 @@ void main() {
     expect(
         find.text('Select a file from the workspace to edit'), findsOneWidget);
 
-    // 5. Create two files: index.html and style.css
-    await tester.tap(find.byKey(const Key('add_file_button')));
-    await settleDb(tester);
-    await tester.enterText(
-        find.byKey(const Key('node_name_input')), 'index.html');
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('save_node_button')));
-    await settleDb(tester);
-
-    await tester.tap(find.byKey(const Key('add_file_button')));
-    await settleDb(tester);
-    await tester.enterText(
-        find.byKey(const Key('node_name_input')), 'style.css');
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('save_node_button')));
-    await settleDb(tester);
-
-    // 6. Open "index.html" -> Tab appears & Editor opens
+    // 5. Open "index.html" -> Tab appears & Editor opens
     await tester.tap(find.byKey(const Key('node_index.html')));
     await settleDb(tester);
     expect(find.byKey(const Key('tab_index.html')), findsOneWidget);
@@ -356,7 +337,7 @@ void main() {
     await tester.tap(find.byKey(const Key('editor_save_button')));
     await settleDb(tester);
 
-    // 7. Open "style.css" -> Second tab appears & active editor switches
+    // 6. Open "style.css" -> Second tab appears & active editor switches
     await tester.tap(find.byKey(const Key('node_style.css')));
     await settleDb(tester);
     expect(find.byKey(const Key('tab_index.html')), findsOneWidget);
@@ -369,12 +350,12 @@ void main() {
     await tester.tap(find.byKey(const Key('editor_save_button')));
     await settleDb(tester);
 
-    // 8. Switch back to "index.html" tab -> verify content
+    // 7. Switch back to "index.html" tab -> verify content
     await tester.tap(find.byKey(const Key('tab_index.html')));
     await settleDb(tester);
     expect(find.text('<h1>Nomad V0.0</h1>'), findsOneWidget);
 
-    // 9. Close "index.html" tab -> active editor switches to style.css
+    // 8. Close "index.html" tab -> active editor switches to style.css
     await tester.tap(find.byKey(const Key('close_tab_index.html')));
     await settleDb(tester);
     expect(find.byKey(const Key('tab_index.html')), findsNothing);

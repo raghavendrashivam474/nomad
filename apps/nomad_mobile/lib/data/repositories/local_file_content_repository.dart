@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -24,8 +24,8 @@ class LocalFileContentRepository implements FileContentRepository {
   Future<String> readFile(EntityId projectId, EntityId fileNodeId) async {
     try {
       final file = await _getFile(projectId, fileNodeId);
-      if (await file.exists()) {
-        return await file.readAsString();
+      if (file.existsSync()) {
+        return file.readAsStringSync();
       }
       return '';
     } catch (e) {
@@ -38,8 +38,8 @@ class LocalFileContentRepository implements FileContentRepository {
       EntityId projectId, EntityId fileNodeId, String content) async {
     try {
       final file = await _getFile(projectId, fileNodeId);
-      await file.create(recursive: true);
-      await file.writeAsString(content);
+      file.createSync(recursive: true);
+      file.writeAsStringSync(content);
     } catch (e) {
       throw DomainException('Failed to write file content', cause: e);
     }
@@ -49,8 +49,8 @@ class LocalFileContentRepository implements FileContentRepository {
   Future<void> deleteContent(EntityId projectId, EntityId fileNodeId) async {
     try {
       final file = await _getFile(projectId, fileNodeId);
-      if (await file.exists()) {
-        await file.delete();
+      if (file.existsSync()) {
+        file.deleteSync();
       }
     } catch (e) {
       throw DomainException('Failed to delete file content', cause: e);
@@ -64,8 +64,8 @@ class LocalFileContentRepository implements FileContentRepository {
       final projectDir = Directory(
         p.join(baseDir.path, 'nomad_workspaces', projectId.value),
       );
-      if (await projectDir.exists()) {
-        await projectDir.delete(recursive: true);
+      if (projectDir.existsSync()) {
+        projectDir.deleteSync(recursive: true);
       }
     } catch (e) {
       throw DomainException('Failed to delete project file contents', cause: e);

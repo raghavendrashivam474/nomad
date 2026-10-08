@@ -1,17 +1,20 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
 import '../branding/nomad_brand.dart';
+import '../data/templates/web_template.dart';
 
 class ProjectsView extends StatefulWidget {
   final ProjectRepository repository;
   final WorkspaceRepository? workspaceRepository;
+  final FileContentRepository? contentRepository;
   final ValueChanged<Project>? onProjectSelected;
 
   const ProjectsView({
     super.key,
     required this.repository,
     this.workspaceRepository,
+    this.contentRepository,
     this.onProjectSelected,
   });
 
@@ -39,9 +42,78 @@ class _ProjectsViewState extends State<ProjectsView> {
     }
   }
 
+  /// Materialises a new project and, for Web projects, its starter
+  /// HTML/CSS/JS workspace files.
+  ///
+  /// If any step fails after the project row is written, the partially
+  /// created project, workspace nodes and file contents are removed so the
+  /// user is never left with a half-created project.
+  Future<void> _createProject(String name, ProjectType type) async {
+    final now = DateTime.now();
+    final projectId = EntityId(const Uuid().v4());
+    final newProject = Project(
+      id: projectId,
+      name: name,
+      type: type,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    try {
+      await widget.repository.saveProject(newProject);
+
+      final workspace = widget.workspaceRepository;
+      final contents = widget.contentRepository;
+
+      if (type == ProjectType.web && workspace != null && contents != null) {
+        final starters = <String, String>{
+          'index.html': WebTemplate.indexHtml,
+          'style.css': WebTemplate.styleCss,
+          'script.js': WebTemplate.scriptJs,
+        };
+
+        for (final entry in starters.entries) {
+          final node = FileNode(
+            id: EntityId(const Uuid().v4()),
+            projectId: projectId,
+            name: entry.key,
+            type: FileNodeType.file,
+            createdAt: now,
+            updatedAt: now,
+          );
+          await workspace.createNode(node);
+          await contents.writeFile(projectId, node.id, entry.value);
+        }
+      }
+    } catch (e) {
+      // Partial failure: roll back everything we may have written.
+      try {
+        await widget.repository.deleteProject(projectId);
+        await widget.workspaceRepository?.deleteAllNodesForProject(projectId);
+        await widget.contentRepository?.deleteAllContentForProject(projectId);
+      } catch (_) {
+        // Surface the original failure, not the cleanup failure.
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create project: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    await _loadProjects();
+  }
+
   Future<void> _createProjectDialog() async {
     final nameController = TextEditingController();
     var selectedType = ProjectType.web;
+    var confirmed = false;
 
     await showDialog<void>(
       context: context,
@@ -104,24 +176,10 @@ class _ProjectsViewState extends State<ProjectsView> {
                 ),
                 FilledButton(
                   key: const Key('save_project_button'),
-                  onPressed: () async {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) return;
-
-                    final now = DateTime.now();
-                    final newProject = Project(
-                      id: EntityId(const Uuid().v4()),
-                      name: name,
-                      type: selectedType,
-                      createdAt: now,
-                      updatedAt: now,
-                    );
-
-                    await widget.repository.saveProject(newProject);
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                    }
-                    await _loadProjects();
+                  onPressed: () {
+                    if (nameController.text.trim().isEmpty) return;
+                    confirmed = true;
+                    Navigator.of(ctx).pop();
                   },
                   child: const Text('Create'),
                 ),
@@ -131,13 +189,15 @@ class _ProjectsViewState extends State<ProjectsView> {
         );
       },
     );
+
+    if (!confirmed) return;
+    await _createProject(nameController.text.trim(), selectedType);
   }
 
   Future<void> _deleteProject(EntityId id) async {
     await widget.repository.deleteProject(id);
-    if (widget.workspaceRepository != null) {
-      await widget.workspaceRepository!.deleteAllNodesForProject(id);
-    }
+    await widget.workspaceRepository?.deleteAllNodesForProject(id);
+    await widget.contentRepository?.deleteAllContentForProject(id);
     await _loadProjects();
   }
 

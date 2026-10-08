@@ -284,6 +284,7 @@ class _AppShellState extends State<AppShell> {
                           setState(() => _selectedIndex = idx),
                       repository: widget.repository,
                       workspaceRepository: widget.workspaceRepository,
+                      contentRepository: widget.contentRepository,
                       onProjectSelected: (project) =>
                           setState(() => _selectedProject = project),
                     )
@@ -295,6 +296,7 @@ class _AppShellState extends State<AppShell> {
                       : ProjectsView(
                           repository: widget.repository,
                           workspaceRepository: widget.workspaceRepository,
+                          contentRepository: widget.contentRepository,
                           onProjectSelected: (project) =>
                               setState(() => _selectedProject = project),
                         ),
@@ -377,6 +379,7 @@ class _TabletLayout extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final ProjectRepository repository;
   final WorkspaceRepository workspaceRepository;
+  final FileContentRepository contentRepository;
   final ValueChanged<Project> onProjectSelected;
 
   const _TabletLayout({
@@ -384,6 +387,7 @@ class _TabletLayout extends StatelessWidget {
     required this.onDestinationSelected,
     required this.repository,
     required this.workspaceRepository,
+    required this.contentRepository,
     required this.onProjectSelected,
   });
 
@@ -461,6 +465,7 @@ class _TabletLayout extends StatelessWidget {
                 : ProjectsView(
                     repository: repository,
                     workspaceRepository: workspaceRepository,
+                    contentRepository: contentRepository,
                     onProjectSelected: onProjectSelected,
                   ),
           ),
