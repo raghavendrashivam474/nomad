@@ -1,0 +1,14 @@
+﻿name: nomad_core
+description: Core domain primitives, identifiers, contracts, and exceptions for Nomad.
+version: 0.0.1
+homepage: https://github.com/nomad-lab/nomad
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
