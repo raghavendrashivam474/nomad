@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../editor/code_editing_controller.dart';
@@ -8,12 +8,18 @@ class EditorView extends StatefulWidget {
   final FileNode fileNode;
   final FileContentRepository contentRepository;
   final VoidCallback? onClose;
+  final VoidCallback? onPreview;
+  final VoidCallback? onSaveCompleted;
+  final bool isPreviewActive;
 
   const EditorView({
     super.key,
     required this.fileNode,
     required this.contentRepository,
     this.onClose,
+    this.onPreview,
+    this.onSaveCompleted,
+    this.isPreviewActive = false,
   });
 
   @override
@@ -113,6 +119,9 @@ class _EditorViewState extends State<EditorView> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+
+        // Notify parent that save has completed
+        widget.onSaveCompleted?.call();
       }
     } catch (e) {
       if (mounted) {
@@ -211,6 +220,15 @@ class _EditorViewState extends State<EditorView> {
               ],
             ),
             actions: [
+              if (widget.onPreview != null)
+                IconButton(
+                  key: const Key('editor_preview_button'),
+                  icon: Icon(widget.isPreviewActive
+                      ? Icons.preview
+                      : Icons.preview_outlined),
+                  tooltip: 'Toggle Preview',
+                  onPressed: widget.onPreview,
+                ),
               if (_isSaving)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.0),
