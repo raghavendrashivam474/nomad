@@ -5,6 +5,7 @@ import '../branding/nomad_logo_widget.dart';
 import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
 import '../ui/workspace_view.dart';
+import '../ui/web_preview_view.dart';
 
 const double kTabletBreakpoint = 600.0;
 
@@ -29,6 +30,8 @@ class _AppShellState extends State<AppShell> {
   Project? _selectedProject;
   final List<FileNode> _openTabs = [];
   FileNode? _activeFileNode;
+  bool _showPreview = false;
+  int _previewVersion = 0;
 
   void _onFileSelected(FileNode node) {
     setState(() {
@@ -61,7 +64,18 @@ class _AppShellState extends State<AppShell> {
       _selectedProject = null;
       _openTabs.clear();
       _activeFileNode = null;
+      _showPreview = false;
+      _previewVersion = 0;
     });
+  }
+
+  void _handleSaveCompleted(FileNode node) {
+    final name = node.name;
+    if (name == 'index.html' || name == 'style.css' || name == 'script.js') {
+      setState(() {
+        _previewVersion++;
+      });
+    }
   }
 
   @override
@@ -70,6 +84,18 @@ class _AppShellState extends State<AppShell> {
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth >= kTabletBreakpoint;
 
+        // On phone, if preview is active and a project is open, show the full-screen preview
+        if (!isTablet && _selectedProject != null && _showPreview) {
+          return WebPreviewView(
+            key: ValueKey('preview_${_selectedProject!.id.value}'),
+            project: _selectedProject!,
+            workspaceRepository: widget.workspaceRepository,
+            contentRepository: widget.contentRepository,
+            previewVersion: _previewVersion,
+            onClose: () => setState(() => _showPreview = false),
+          );
+        }
+
         // On phone, if an active file is open, show editor full-screen
         if (!isTablet && _activeFileNode != null) {
           return EditorView(
@@ -77,6 +103,9 @@ class _AppShellState extends State<AppShell> {
             fileNode: _activeFileNode!,
             contentRepository: widget.contentRepository,
             onClose: _closeEditor,
+            onPreview: () => setState(() => _showPreview = true),
+            isPreviewActive: _showPreview,
+            onSaveCompleted: () => _handleSaveCompleted(_activeFileNode!),
           );
         }
 
@@ -229,13 +258,43 @@ class _AppShellState extends State<AppShell> {
                                 ),
                               Expanded(
                                 child: _activeFileNode != null
-                                    ? EditorView(
-                                        key:
-                                            ValueKey(_activeFileNode!.id.value),
-                                        fileNode: _activeFileNode!,
-                                        contentRepository:
-                                            widget.contentRepository,
-                                        onClose: _closeEditor,
+                                    ? Row(
+                                        children: [
+                                          Expanded(
+                                            child: EditorView(
+                                              key: ValueKey(
+                                                  _activeFileNode!.id.value),
+                                              fileNode: _activeFileNode!,
+                                              contentRepository:
+                                                  widget.contentRepository,
+                                              onClose: _closeEditor,
+                                              onPreview: () => setState(() =>
+                                                  _showPreview = !_showPreview),
+                                              isPreviewActive: _showPreview,
+                                              onSaveCompleted: () =>
+                                                  _handleSaveCompleted(
+                                                      _activeFileNode!),
+                                            ),
+                                          ),
+                                          if (_showPreview) ...[
+                                            const VerticalDivider(
+                                                thickness: 1, width: 1),
+                                            Expanded(
+                                              child: WebPreviewView(
+                                                key: ValueKey(
+                                                    'preview_${_selectedProject!.id.value}'),
+                                                project: _selectedProject!,
+                                                workspaceRepository:
+                                                    widget.workspaceRepository,
+                                                contentRepository:
+                                                    widget.contentRepository,
+                                                previewVersion: _previewVersion,
+                                                onClose: () => setState(
+                                                    () => _showPreview = false),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       )
                                     : Center(
                                         child: Column(
