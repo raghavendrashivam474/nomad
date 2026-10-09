@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../editor/code_editing_controller.dart';
+import '../editor/source_language.dart';
 
 class EditorView extends StatefulWidget {
   final FileNode fileNode;
@@ -19,7 +21,8 @@ class EditorView extends StatefulWidget {
 }
 
 class _EditorViewState extends State<EditorView> {
-  late final TextEditingController _controller;
+  late CodeEditingController _controller;
+  late SourceLanguage _language;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isDirty = false;
@@ -29,14 +32,19 @@ class _EditorViewState extends State<EditorView> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    _language = SourceLanguage.fromFileName(widget.fileNode.name);
+    _controller = CodeEditingController(language: _language);
     _loadContent();
   }
 
   @override
   void didUpdateWidget(covariant EditorView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileNode.id != widget.fileNode.id) {
+    if (oldWidget.fileNode.id != widget.fileNode.id ||
+        oldWidget.fileNode.name != widget.fileNode.name) {
+      _language = SourceLanguage.fromFileName(widget.fileNode.name);
+      _controller.dispose();
+      _controller = CodeEditingController(language: _language);
       _loadContent();
     }
   }
@@ -131,6 +139,19 @@ class _EditorViewState extends State<EditorView> {
     }
   }
 
+  IconData _getLanguageIcon() {
+    switch (_language) {
+      case SourceLanguage.html:
+        return Icons.html;
+      case SourceLanguage.css:
+        return Icons.css;
+      case SourceLanguage.javascript:
+        return Icons.javascript;
+      case SourceLanguage.plainText:
+        return Icons.code;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = '${widget.fileNode.name}${_isDirty ? ' *' : ''}';
@@ -157,7 +178,7 @@ class _EditorViewState extends State<EditorView> {
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.code, size: 20),
+                Icon(_getLanguageIcon(), size: 20),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
@@ -165,6 +186,26 @@ class _EditorViewState extends State<EditorView> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .secondaryContainer
+                        .withAlpha(120),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _language.displayName,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
                   ),
                 ),
               ],
