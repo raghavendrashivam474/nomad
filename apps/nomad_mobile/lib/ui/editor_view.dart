@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../editor/code_accessory_bar.dart';
 import '../editor/code_editing_controller.dart';
+import '../editor/contextual_code_panel.dart';
 import '../editor/source_language.dart';
 
 class EditorView extends StatefulWidget {
@@ -28,10 +30,12 @@ class EditorView extends StatefulWidget {
 
 class _EditorViewState extends State<EditorView> {
   late CodeEditingController _controller;
+  late FocusNode _focusNode;
   late SourceLanguage _language;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isDirty = false;
+  bool _isPanelExpanded = false;
   String? _errorMessage;
   String _initialContent = '';
 
@@ -40,6 +44,8 @@ class _EditorViewState extends State<EditorView> {
     super.initState();
     _language = SourceLanguage.fromFileName(widget.fileNode.name);
     _controller = CodeEditingController(language: _language);
+    _controller.addListener(_onControllerChanged);
+    _focusNode = FocusNode();
     _loadContent();
   }
 
@@ -49,16 +55,30 @@ class _EditorViewState extends State<EditorView> {
     if (oldWidget.fileNode.id != widget.fileNode.id ||
         oldWidget.fileNode.name != widget.fileNode.name) {
       _language = SourceLanguage.fromFileName(widget.fileNode.name);
+      _controller.removeListener(_onControllerChanged);
       _controller.dispose();
       _controller = CodeEditingController(language: _language);
+      _controller.addListener(_onControllerChanged);
+      _isPanelExpanded = false;
       _loadContent();
     }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    final dirty = _controller.text != _initialContent;
+    if (dirty != _isDirty) {
+      setState(() {
+        _isDirty = dirty;
+      });
+    }
   }
 
   Future<void> _loadContent() async {
@@ -73,8 +93,8 @@ class _EditorViewState extends State<EditorView> {
         widget.fileNode.id,
       );
       if (mounted) {
-        _controller.text = content;
         _initialContent = content;
+        _controller.text = content;
         setState(() {
           _isLoading = false;
           _isDirty = false;
@@ -139,13 +159,10 @@ class _EditorViewState extends State<EditorView> {
     }
   }
 
-  void _onTextChanged(String value) {
-    final dirty = value != _initialContent;
-    if (dirty != _isDirty) {
-      setState(() {
-        _isDirty = dirty;
-      });
-    }
+  void _togglePanel() {
+    setState(() {
+      _isPanelExpanded = !_isPanelExpanded;
+    });
   }
 
   IconData _getLanguageIcon() {
@@ -271,26 +288,52 @@ class _EditorViewState extends State<EditorView> {
                         ),
                       ),
                     )
-                  : Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: TextField(
-                        key: const Key('editor_text_field'),
-                        controller: _controller,
-                        maxLines: null,
-                        expands: true,
-                        keyboardType: TextInputType.multiline,
-                        autofocus: true,
-                        onChanged: _onTextChanged,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 14.0,
-                          height: 1.4,
+                  : Column(
+                      children: [
+                        // Main text editing field
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: TextField(
+                              key: const Key('editor_text_field'),
+                              controller: _controller,
+                              focusNode: _focusNode,
+                              maxLines: null,
+                              expands: true,
+                              keyboardType: TextInputType.multiline,
+                              autofocus: true,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 14.0,
+                                height: 1.4,
+                              ),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: 'Type your code here...',
+                              ),
+                            ),
+                          ),
                         ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'Type your code here...',
+
+                        // Expandable Contextual Panel
+                        if (_isPanelExpanded)
+                          ContextualCodePanel(
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            language: _language,
+                            onClose: () =>
+                                setState(() => _isPanelExpanded = false),
+                          ),
+
+                        // Compact Coding Accessory Bar
+                        CodeAccessoryBar(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          language: _language,
+                          isPanelExpanded: _isPanelExpanded,
+                          onTogglePanel: _togglePanel,
                         ),
-                      ),
+                      ],
                     ),
         ),
       ),

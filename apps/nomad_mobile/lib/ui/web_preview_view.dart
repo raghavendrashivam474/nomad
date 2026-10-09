@@ -1,4 +1,4 @@
-﻿/// Web Lab preview surface for Nomad.
+/// Web Lab preview surface for Nomad.
 library;
 
 import 'package:flutter/material.dart';
@@ -73,7 +73,8 @@ class _WebPreviewViewState extends State<WebPreviewView> {
     });
 
     try {
-      final fileNodes = await widget.workspaceRepository.getNodesForProject(widget.project.id);
+      final fileNodes = await widget.workspaceRepository
+          .getNodesForProject(widget.project.id);
       final indexNode = _findFile(fileNodes, _kIndexHtml);
       if (indexNode == null) {
         if (mounted) {
@@ -103,7 +104,8 @@ class _WebPreviewViewState extends State<WebPreviewView> {
       final assembled = await _assembleDocument(fileNodes, html);
       if (mounted) {
         // Set baseUrl to https://localhost/ so window.localStorage and web APIs have a valid origin.
-        await _controller.loadHtmlString(assembled, baseUrl: 'https://localhost/');
+        await _controller.loadHtmlString(assembled,
+            baseUrl: 'https://localhost/');
       }
     } catch (e) {
       if (mounted) {
@@ -116,7 +118,8 @@ class _WebPreviewViewState extends State<WebPreviewView> {
     }
   }
 
-  Future<String> _assembleDocument(List<FileNode> fileNodes, String html) async {
+  Future<String> _assembleDocument(
+      List<FileNode> fileNodes, String html) async {
     var result = html;
 
     // Inline CSS
@@ -161,9 +164,7 @@ class _WebPreviewViewState extends State<WebPreviewView> {
   }
 
   FileNode? _findFile(List<FileNode> fileNodes, String name) {
-    return fileNodes
-        .where((f) => f.isFile && f.name == name)
-        .firstOrNull;
+    return fileNodes.where((f) => f.isFile && f.name == name).firstOrNull;
   }
 
   @override
