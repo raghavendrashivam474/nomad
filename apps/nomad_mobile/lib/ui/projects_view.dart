@@ -130,43 +130,45 @@ class _ProjectsViewState extends State<ProjectsView> {
               ),
               content: SizedBox(
                 width: 320,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      key: const Key('project_name_input'),
-                      controller: nameController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Project Name',
-                        hintText: 'e.g. My Website',
-                        border: OutlineInputBorder(),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        key: const Key('project_name_input'),
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Project Name',
+                          hintText: 'e.g. My Website',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: NomadBrand.space16),
-                    DropdownButtonFormField<ProjectType>(
-                      // ignore: deprecated_member_use
-                      value: selectedType,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Project Type',
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: NomadBrand.space16),
+                      DropdownButtonFormField<ProjectType>(
+                        // ignore: deprecated_member_use
+                        value: selectedType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Project Type',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: ProjectType.values.map((type) {
+                          return DropdownMenuItem(
+                            value: type,
+                            child: Text(type == ProjectType.web
+                                ? 'Web Application'
+                                : 'Android App'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedType = val);
+                          }
+                        },
                       ),
-                      items: ProjectType.values.map((type) {
-                        return DropdownMenuItem(
-                          value: type,
-                          child: Text(type == ProjectType.web
-                              ? 'Web Application'
-                              : 'Android App'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => selectedType = val);
-                        }
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
