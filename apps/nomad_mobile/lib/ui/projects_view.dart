@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
 import '../branding/nomad_brand.dart';

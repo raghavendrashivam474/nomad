@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/editor/code_editing_controller.dart';
@@ -39,12 +39,17 @@ void main() {
       expect(SourceLanguage.fromFileName('index.html'), SourceLanguage.html);
       expect(SourceLanguage.fromFileName('about.htm'), SourceLanguage.html);
       expect(SourceLanguage.fromFileName('style.css'), SourceLanguage.css);
-      expect(SourceLanguage.fromFileName('script.js'), SourceLanguage.javascript);
+      expect(
+          SourceLanguage.fromFileName('script.js'), SourceLanguage.javascript);
       expect(SourceLanguage.fromFileName('app.mjs'), SourceLanguage.javascript);
-      expect(SourceLanguage.fromFileName('module.cjs'), SourceLanguage.javascript);
-      expect(SourceLanguage.fromFileName('README.md'), SourceLanguage.plainText);
-      expect(SourceLanguage.fromFileName('notes.txt'), SourceLanguage.plainText);
-      expect(SourceLanguage.fromFileName('noextension'), SourceLanguage.plainText);
+      expect(
+          SourceLanguage.fromFileName('module.cjs'), SourceLanguage.javascript);
+      expect(
+          SourceLanguage.fromFileName('README.md'), SourceLanguage.plainText);
+      expect(
+          SourceLanguage.fromFileName('notes.txt'), SourceLanguage.plainText);
+      expect(
+          SourceLanguage.fromFileName('noextension'), SourceLanguage.plainText);
     });
   });
 
@@ -52,7 +57,8 @@ void main() {
     testWidgets('tokenizes valid HTML without error', (tester) async {
       final controller = CodeEditingController(
         language: SourceLanguage.html,
-        text: '<!DOCTYPE html>\n<html>\n<!-- Comment -->\n<body class="main">&copy; Hello</body>\n</html>',
+        text:
+            '<!DOCTYPE html>\n<html>\n<!-- Comment -->\n<body class="main">&copy; Hello</body>\n</html>',
       );
 
       await tester.pumpWidget(
@@ -101,7 +107,8 @@ void main() {
       );
     });
 
-    testWidgets('opens HTML file, shows language badge, edits and saves', (tester) async {
+    testWidgets('opens HTML file, shows language badge, edits and saves',
+        (tester) async {
       await contentRepo.writeFile(
         htmlNode.projectId,
         htmlNode.id,
@@ -141,8 +148,10 @@ void main() {
       expect(find.text('index.html'), findsOneWidget);
 
       // Verify persistence
-      final savedContent = await contentRepo.readFile(htmlNode.projectId, htmlNode.id);
-      expect(savedContent, '<h1>Updated Nomad HTML</h1>\n<p>Authoring works!</p>');
+      final savedContent =
+          await contentRepo.readFile(htmlNode.projectId, htmlNode.id);
+      expect(
+          savedContent, '<h1>Updated Nomad HTML</h1>\n<p>Authoring works!</p>');
     });
   });
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'source_language.dart';
 
 /// A lightweight, dependency-free syntax-highlighting TextEditingController.
@@ -40,10 +40,14 @@ class CodeEditingController extends TextEditingController {
     final spans = <TextSpan>[];
 
     final tagColor = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
-    final attrColor = isDark ? const Color(0xFF9CDCFE) : const Color(0xFFFF0000);
-    final stringColor = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
-    final commentColor = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
-    final entityColor = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
+    final attrColor =
+        isDark ? const Color(0xFF9CDCFE) : const Color(0xFFFF0000);
+    final stringColor =
+        isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+    final commentColor =
+        isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+    final entityColor =
+        isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
 
     final htmlRegex = RegExp(
       r'(<!--[\s\S]*?-->)|' // 1: Comments
@@ -51,7 +55,8 @@ class CodeEditingController extends TextEditingController {
       r'(</?[a-zA-Z0-9\-]+)|' // 3: Tag names
       r'(/?>)|' // 4: Tag close
       r'([a-zA-Z\-:]+)(?=\s*=)|' // 5: Attribute names
-      r'("(?:[^"\\]|\\.)*"|' r"'(?:[^'\\]|\\.)*')|" // 6: Strings
+      r'("(?:[^"\\]|\\.)*"|'
+      r"'(?:[^'\\]|\\.)*')|" // 6: Strings
       r'(&[a-zA-Z0-9#]+;)', // 7: Entities
       caseSensitive: false,
     );
@@ -117,17 +122,24 @@ class CodeEditingController extends TextEditingController {
   TextSpan _buildCssSpans(String code, TextStyle? baseStyle, bool isDark) {
     final spans = <TextSpan>[];
 
-    final commentColor = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
-    final atRuleColor = isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
-    final selectorColor = isDark ? const Color(0xFFD7BA7D) : const Color(0xFF800000);
-    final propertyColor = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
-    final valueColor = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
-    final stringColor = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+    final commentColor =
+        isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+    final atRuleColor =
+        isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
+    final selectorColor =
+        isDark ? const Color(0xFFD7BA7D) : const Color(0xFF800000);
+    final propertyColor =
+        isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
+    final valueColor =
+        isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
+    final stringColor =
+        isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
 
     final cssRegex = RegExp(
       r'(/\*[\s\S]*?\*/)|' // 1: Comments /* ... */
       r'(@[a-zA-Z\-]+)|' // 2: At-rules (@media, @import, @keyframes)
-      r'("(?:[^"\\]|\\.)*"|' r"'(?:[^'\\]|\\.)*')|" // 3: Strings
+      r'("(?:[^"\\]|\\.)*"|'
+      r"'(?:[^'\\]|\\.)*')|" // 3: Strings
       r'([a-zA-Z\-]+)(?=\s*:)|' // 4: Property names (color, margin-top)
       r'(#[a-fA-F0-9]{3,8}\b)|' // 5: Hex Colors (#fff, #38bdf8)
       r'(\b\d+(?:\.\d+)?(?:px|rem|em|vh|vw|%|s|ms|deg)?\b)|' // 6: Numbers & units
@@ -194,17 +206,26 @@ class CodeEditingController extends TextEditingController {
   TextSpan _buildJsSpans(String code, TextStyle? baseStyle, bool isDark) {
     final spans = <TextSpan>[];
 
-    final commentColor = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
-    final keywordColor = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
-    final controlColor = isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
-    final stringColor = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
-    final numberColor = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
-    final functionColor = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
-    final globalColor = isDark ? const Color(0xFF4EC9B0) : const Color(0xFF267F99);
+    final commentColor =
+        isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+    final keywordColor =
+        isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
+    final controlColor =
+        isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
+    final stringColor =
+        isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+    final numberColor =
+        isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
+    final functionColor =
+        isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
+    final globalColor =
+        isDark ? const Color(0xFF4EC9B0) : const Color(0xFF267F99);
 
     final jsRegex = RegExp(
       r'(/\*[\s\S]*?\*/|//[^\r\n]*)|' // 1: Comments (single or multi-line)
-      r'("(?:[^"\\]|\\.)*"|' r"'(?:[^'\\]|\\.)*'|" r'`(?:[^`\\]|\\.)*`)|' // 2: Strings & template literals
+      r'("(?:[^"\\]|\\.)*"|'
+      r"'(?:[^'\\]|\\.)*'|"
+      r'`(?:[^`\\]|\\.)*`)|' // 2: Strings & template literals
       r'(\b(?:break|case|catch|continue|default|do|else|finally|for|if|return|switch|throw|try|while|yield|await)\b)|' // 3: Control flow keywords
       r'(\b(?:const|let|var|function|class|extends|new|this|super|import|export|from|as|async|typeof|instanceof|void|delete|in|of)\b)|' // 4: Declaration & operator keywords
       r'(\b(?:true|false|null|undefined|NaN|Infinity)\b)|' // 5: Built-in literals

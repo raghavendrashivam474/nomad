@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/editor/code_editing_controller.dart';
@@ -35,7 +35,9 @@ class InMemoryFileContentRepository implements FileContentRepository {
 
 void main() {
   group('S0.1.3 CSS Tokenizer & Highlighting', () {
-    testWidgets('tokenizes valid CSS properties, selectors and values without error', (tester) async {
+    testWidgets(
+        'tokenizes valid CSS properties, selectors and values without error',
+        (tester) async {
       const cssCode = '''
 /* Nomad Theme Stylesheet */
 @media (min-width: 600px) {
@@ -104,7 +106,9 @@ void main() {
       );
     });
 
-    testWidgets('opens CSS file, shows CSS badge, edits, saves and verifies persistence', (tester) async {
+    testWidgets(
+        'opens CSS file, shows CSS badge, edits, saves and verifies persistence',
+        (tester) async {
       await contentRepo.writeFile(
         cssNode.projectId,
         cssNode.id,
@@ -127,7 +131,8 @@ void main() {
       expect(find.text('body { margin: 0; }'), findsOneWidget);
 
       // Edit CSS
-      const newCss = 'body {\n  margin: 0;\n  background-color: #0f172a;\n  color: #f8fafc;\n}';
+      const newCss =
+          'body {\n  margin: 0;\n  background-color: #0f172a;\n  color: #f8fafc;\n}';
       await tester.enterText(
         find.byKey(const Key('editor_text_field')),
         newCss,

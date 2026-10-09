@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';

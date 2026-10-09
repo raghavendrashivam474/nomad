@@ -1,4 +1,4 @@
-﻿/// Represents supported programming/markup languages recognized by Nomad.
+/// Represents supported programming/markup languages recognized by Nomad.
 enum SourceLanguage {
   html('HTML', ['html', 'htm']),
   css('CSS', ['css']),

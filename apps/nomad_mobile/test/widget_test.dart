@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_mobile/app/nomad_app.dart';
@@ -82,8 +82,7 @@ void main() {
     await settleDb(tester);
 
     expect(find.text('Tablet View'), findsOneWidget);
-    expect(
-        find.text('${NomadBrand.productName} — ${NomadBrand.tagline}'),
+    expect(find.text('${NomadBrand.productName} — ${NomadBrand.tagline}'),
         findsOneWidget);
     expect(find.text('Lab'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);

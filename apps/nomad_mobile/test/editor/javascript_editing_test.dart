@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/editor/code_editing_controller.dart';
@@ -35,7 +35,9 @@ class InMemoryFileContentRepository implements FileContentRepository {
 
 void main() {
   group('S0.1.4 JavaScript Tokenizer & Highlighting', () {
-    testWidgets('tokenizes keywords, globals, functions, and literals correctly', (tester) async {
+    testWidgets(
+        'tokenizes keywords, globals, functions, and literals correctly',
+        (tester) async {
       // Use escaped \$ to prevent Dart compiler from treating it as Dart string interpolation
       const jsCode = '''
 // Nomad Web Lab Script
@@ -64,7 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
       expect(controller.text, contains('const count = 42;'));
     });
 
-    testWidgets('malformed JavaScript does not crash the editor', (tester) async {
+    testWidgets('malformed JavaScript does not crash the editor',
+        (tester) async {
       final controller = CodeEditingController(
         language: SourceLanguage.javascript,
         text: 'const x = ; if ( { function broken(`unclosed string',
@@ -98,7 +101,9 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     });
 
-    testWidgets('opens JS file, shows JavaScript badge, edits, saves and verifies persistence', (tester) async {
+    testWidgets(
+        'opens JS file, shows JavaScript badge, edits, saves and verifies persistence',
+        (tester) async {
       await contentRepo.writeFile(
         jsNode.projectId,
         jsNode.id,
@@ -121,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
       expect(find.text('console.log("hello");'), findsOneWidget);
 
       // Edit JS
-      const newJs = 'document.getElementById("btn").addEventListener("click", () => alert("Saved!"));';
+      const newJs =
+          'document.getElementById("btn").addEventListener("click", () => alert("Saved!"));';
       await tester.enterText(
         find.byKey(const Key('editor_text_field')),
         newJs,
