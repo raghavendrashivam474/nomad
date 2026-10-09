@@ -11,6 +11,7 @@ This directory documents all significant architectural decisions made within the
 | [ADR-0003](ADR-0003-workspace-and-file-model.md) | Workspace and File Hierarchy Domain Model | **Accepted** | S0.0.4 |
 | [ADR-0004](ADR-0004-file-content-storage-and-editor.md) | File Content Persistence & Basic Editor Architecture | **Accepted** | S0.0.5 |
 | [ADR-0005](ADR-0005-responsive-workspace-layout.md) | Responsive Foundation & Multi-File Workspace Layout | **Accepted** | S0.0.6 |
+| [ADR-0006](ADR-0006-embedded-http-server.md) | Embedded HTTP Server for Multi-File Web Preview | **Proposed** | MF-1 |
 
 ---
 
