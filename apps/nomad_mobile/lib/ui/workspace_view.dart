@@ -140,7 +140,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
           borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
         ),
         title: Text(
-          'Rename ${node.isFolder ? "Folder" : "File"}',
+          'Rename ${node.name}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: TextField(
@@ -163,7 +163,8 @@ class _WorkspaceViewState extends State<WorkspaceView> {
               final newName = nameController.text.trim();
               if (newName.isEmpty ||
                   newName.contains('/') ||
-                  newName.contains('\\')) {
+                  newName.contains('\\') ||
+                  newName == node.name) {
                 return;
               }
 
@@ -180,9 +181,186 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     );
   }
 
+  /// Calculates all descendant folder IDs of a given folder.
+  Set<EntityId> _getDescendantFolderIds(EntityId folderId) {
+    final descendants = <EntityId>{};
+    final queue = <EntityId>[folderId];
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+      final children = _allNodes
+          .where((n) => n.isFolder && n.parentId == current)
+          .map((n) => n.id);
+      for (final child in children) {
+        if (descendants.add(child)) {
+          queue.add(child);
+        }
+      }
+    }
+
+    return descendants;
+  }
+
+  /// Displays the destination picker dialog for moving a file or folder.
+  Future<void> _showMoveDialog(FileNode node) async {
+    final invalidTargets = <EntityId?>{node.parentId};
+    if (node.isFolder) {
+      invalidTargets.add(node.id);
+      invalidTargets.addAll(_getDescendantFolderIds(node.id));
+    }
+
+    // Available target folders: Root + all non-invalid folders
+    final targetFolders = _allNodes
+        .where((n) => n.isFolder && !invalidTargets.contains(n.id))
+        .toList();
+
+    EntityId? selectedTargetId = node.parentId == null
+        ? (targetFolders.isNotEmpty ? targetFolders.first.id : null)
+        : null;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
+            ),
+            title: Text(
+              'Move "${node.name}"',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select destination folder:'),
+                  const SizedBox(height: NomadBrand.space12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<EntityId?>(
+                            key: const Key('move_dest_root'),
+                            title: const Text('/ (Workspace Root)'),
+                            value: null,
+                            groupValue:
+                                selectedTargetId, // ignore: deprecated_member_use
+                            onChanged: node.parentId ==
+                                    null // ignore: deprecated_member_use
+                                ? null // Already at root
+                                : (val) => setDialogState(() =>
+                                    selectedTargetId =
+                                        val), // ignore: deprecated_member_use
+                          ),
+                          ...targetFolders.map((folder) {
+                            final isCurrentParent = node.parentId == folder.id;
+                            return RadioListTile<EntityId?>(
+                              key: Key('move_dest_${folder.name}'),
+                              title: Text(folder.name),
+                              secondary: const Icon(Icons.folder_outlined),
+                              value: folder.id,
+                              groupValue:
+                                  selectedTargetId, // ignore: deprecated_member_use
+                              onChanged:
+                                  isCurrentParent // ignore: deprecated_member_use
+                                      ? null
+                                      : (val) => setDialogState(() =>
+                                          selectedTargetId =
+                                              val), // ignore: deprecated_member_use
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const Key('confirm_move_button'),
+                onPressed: selectedTargetId == node.parentId
+                    ? null
+                    : () => Navigator.of(ctx).pop(true),
+                child: const Text('Move'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await widget.workspaceRepository.moveNode(node.id, selectedTargetId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Moved "${node.name}" successfully'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          await _loadNodes();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Move failed: $e'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteNode(FileNode node) async {
-    await widget.workspaceRepository.deleteNode(node.id);
-    await _loadNodes();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NomadBrand.radiusLarge),
+        ),
+        title: Text(
+          'Delete ${node.name}?',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          node.isFolder
+              ? 'This will permanently delete this folder and all its contents.'
+              : 'This will permanently delete this file.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('confirm_delete_button'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await widget.workspaceRepository.deleteNode(node.id);
+      await _loadNodes();
+    }
   }
 
   @override
@@ -195,24 +373,16 @@ class _WorkspaceViewState extends State<WorkspaceView> {
             ? IconButton(
                 key: const Key('workspace_back_button'),
                 icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back to Projects',
                 onPressed: widget.onBack,
               )
             : null,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.project.name,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(
-              _folderBreadcrumbs.isEmpty
-                  ? 'Workspace Root'
-                  : '/ ${_folderBreadcrumbs.map((f) => f.name).join(' / ')}',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
+        title: Text(
+          _folderBreadcrumbs.isEmpty
+              ? widget.project.name
+              : _folderBreadcrumbs.map((f) => f.name).join('/'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           IconButton(
@@ -323,6 +493,8 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                                 onSelected: (action) {
                                   if (action == 'rename') {
                                     _showRenameDialog(node);
+                                  } else if (action == 'move') {
+                                    _showMoveDialog(node);
                                   } else if (action == 'delete') {
                                     _deleteNode(node);
                                   }
@@ -335,6 +507,17 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                                         Icon(Icons.edit_outlined, size: 18),
                                         SizedBox(width: 8),
                                         Text('Rename'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'move',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.drive_file_move_outlined,
+                                            size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Move'),
                                       ],
                                     ),
                                   ),
