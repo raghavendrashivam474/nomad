@@ -67,6 +67,84 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
   }
 
   @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {
+    final db = await _dbProvider();
+
+    // 1. Verify source node exists
+    final sourceNode = await getNodeById(id);
+    if (sourceNode == null) {
+      throw const DomainException('Source node does not exist');
+    }
+
+    // 2. If moving to same parent, it's a no-op
+    if (sourceNode.parentId == newParentId) {
+      return;
+    }
+
+    // 3. Prevent self-move
+    if (newParentId != null && sourceNode.id == newParentId) {
+      throw const DomainException('Cannot move a node into itself');
+    }
+
+    // 4. Validate destination if not root
+    if (newParentId != null) {
+      final targetFolder = await getNodeById(newParentId);
+      if (targetFolder == null) {
+        throw const DomainException('Destination folder does not exist');
+      }
+      if (!targetFolder.isFolder) {
+        throw const DomainException('Destination must be a folder');
+      }
+      if (targetFolder.projectId != sourceNode.projectId) {
+        throw const DomainException('Cannot move across projects');
+      }
+
+      // 5. Prevent moving a folder into any of its own descendants (cycle prevention)
+      if (sourceNode.isFolder) {
+        EntityId? currentAncestorId = targetFolder.parentId;
+        while (currentAncestorId != null) {
+          if (currentAncestorId == sourceNode.id) {
+            throw const DomainException(
+              'Cannot move a folder into one of its descendants',
+            );
+          }
+          final ancestor = await getNodeById(currentAncestorId);
+          currentAncestorId = ancestor?.parentId;
+        }
+      }
+    }
+
+    // 6. Check for sibling name collisions at the destination
+    final siblingRows = await db.query(
+      AppDatabase.tableFileNodes,
+      where: newParentId == null
+          ? '${AppDatabase.columnProjectId} = ? AND ${AppDatabase.columnParentId} IS NULL AND ${AppDatabase.columnName} = ?'
+          : '${AppDatabase.columnProjectId} = ? AND ${AppDatabase.columnParentId} = ? AND ${AppDatabase.columnName} = ?',
+      whereArgs: newParentId == null
+          ? [sourceNode.projectId.value, sourceNode.name]
+          : [sourceNode.projectId.value, newParentId.value, sourceNode.name],
+    );
+
+    if (siblingRows.isNotEmpty) {
+      throw DomainException(
+        'An item named "${sourceNode.name}" already exists in the destination folder',
+      );
+    }
+
+    // 7. Perform the atomic update
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      AppDatabase.tableFileNodes,
+      {
+        AppDatabase.columnParentId: newParentId?.value,
+        AppDatabase.columnUpdatedAt: now,
+      },
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+    );
+  }
+
+  @override
   Future<void> deleteNode(EntityId id) async {
     final db = await _dbProvider();
 
