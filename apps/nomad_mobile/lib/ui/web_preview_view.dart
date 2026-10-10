@@ -4,10 +4,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../server/project_file_server.dart';
+import '../server/project_file_resolver.dart';
 
 const _kIndexHtml = 'index.html';
-const _kStyleCss = 'style.css';
-const _kScriptJs = 'script.js';
 
 class WebPreviewView extends StatefulWidget {
   final Project project;
@@ -16,6 +16,10 @@ class WebPreviewView extends StatefulWidget {
   final int previewVersion;
   final VoidCallback? onClose;
 
+  /// Port for the embedded HTTP server. Defaults to 18080.
+  /// Pass 0 in tests to get an ephemeral port.
+  final int serverPort;
+
   const WebPreviewView({
     super.key,
     required this.project,
@@ -23,16 +27,27 @@ class WebPreviewView extends StatefulWidget {
     required this.contentRepository,
     required this.previewVersion,
     this.onClose,
+    this.serverPort = 18080,
   });
 
   @override
-  State<WebPreviewView> createState() => _WebPreviewViewState();
+  State<WebPreviewView> createState() => WebPreviewViewState();
 }
 
-class _WebPreviewViewState extends State<WebPreviewView> {
+class WebPreviewViewState extends State<WebPreviewView> {
   late final WebViewController _controller;
+  ProjectFileServer? _server;
   bool _isLoading = true;
   String? _error;
+
+  /// Expose the controller for test verification.
+  WebViewController get controller => _controller;
+
+  /// Expose the server instance for test verification.
+  ProjectFileServer? get server => _server;
+
+  /// Monotonically increasing token to discard stale async callbacks.
+  int _loadToken = 0;
 
   @override
   void initState() {
@@ -53,31 +68,44 @@ class _WebPreviewViewState extends State<WebPreviewView> {
           },
         ),
       );
-    _renderPreview();
+    _startServerAndLoad();
   }
 
   @override
   void didUpdateWidget(covariant WebPreviewView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.project.id != widget.project.id ||
-        oldWidget.previewVersion != widget.previewVersion) {
-      _renderPreview();
+    if (oldWidget.project.id != widget.project.id) {
+      // Project changed — tear down old server, start fresh.
+      _disposeServer();
+      _startServerAndLoad();
+    } else if (oldWidget.previewVersion != widget.previewVersion) {
+      // Same project, content saved — reload over existing server.
+      _refreshPreview();
     }
   }
 
-  Future<void> _renderPreview() async {
+  // ── Server lifecycle ────────────────────────────────────────────────
+
+  /// Full startup sequence: pre-check → start server → load URL.
+  Future<void> _startServerAndLoad() async {
+    final token = ++_loadToken;
+
     if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
+    // 1. Pre-check: verify index.html exists and is non-empty so we can
+    //    show a meaningful error instead of a raw 404 from the server.
     try {
       final fileNodes = await widget.workspaceRepository
           .getNodesForProject(widget.project.id);
-      final indexNode = _findFile(fileNodes, _kIndexHtml);
+      final indexNode =
+          fileNodes.where((f) => f.isFile && f.name == _kIndexHtml).firstOrNull;
+
       if (indexNode == null) {
-        if (mounted) {
+        if (mounted && token == _loadToken) {
           setState(() {
             _error = 'missing_entry';
             _isLoading = false;
@@ -90,9 +118,8 @@ class _WebPreviewViewState extends State<WebPreviewView> {
         widget.project.id,
         indexNode.id,
       );
-
       if (html.trim().isEmpty) {
-        if (mounted) {
+        if (mounted && token == _loadToken) {
           setState(() {
             _error = 'empty_entry';
             _isLoading = false;
@@ -100,72 +127,94 @@ class _WebPreviewViewState extends State<WebPreviewView> {
         }
         return;
       }
-
-      final assembled = await _assembleDocument(fileNodes, html);
-      if (mounted) {
-        // Set baseUrl to https://localhost/ so window.localStorage and web APIs have a valid origin.
-        await _controller.loadHtmlString(assembled,
-            baseUrl: 'https://localhost/');
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted && token == _loadToken) {
         setState(() {
           _error = 'render_failed';
           _isLoading = false;
         });
-        debugPrint('Preview render failed: $e');
+        debugPrint('Preview pre-check failed: $e');
       }
+      return;
+    }
+
+    // 2. Stop any previous server before binding a new one.
+    await _stopServer();
+    if (token != _loadToken || !mounted) return;
+
+    // 3. Start the embedded HTTP server.
+    try {
+      final resolver = ProjectFileResolver(
+        workspaceRepository: widget.workspaceRepository,
+        contentRepository: widget.contentRepository,
+      );
+      _server = ProjectFileServer(
+        resolver: resolver,
+        port: widget.serverPort,
+      );
+      await _server!.start();
+    } catch (e) {
+      if (mounted && token == _loadToken) {
+        setState(() {
+          _error = 'server_failed';
+          _isLoading = false;
+        });
+        debugPrint('Preview server failed to start: $e');
+      }
+      return;
+    }
+
+    // 4. Load the project entry document over HTTP.
+    if (mounted && token == _loadToken) {
+      final url = Uri.parse(
+        'http://127.0.0.1:${_server!.boundPort}'
+        '/${widget.project.id.value}/$_kIndexHtml',
+      );
+      await _controller.loadRequest(url);
     }
   }
 
-  Future<String> _assembleDocument(
-      List<FileNode> fileNodes, String html) async {
-    var result = html;
-
-    // Inline CSS
-    final cssNode = _findFile(fileNodes, _kStyleCss);
-    if (cssNode != null) {
-      final css = await widget.contentRepository.readFile(
-        widget.project.id,
-        cssNode.id,
-      );
-      if (css.trim().isNotEmpty) {
-        result = result.replaceFirst(
-          '</head>',
-          '<style>\n$css\n</style>\n</head>',
-        );
-      }
-      result = result.replaceAll(
-        RegExp(r'<link[^>]+style\.css[^>]*>'),
-        '',
-      );
+  /// Reload the current document over the running server.
+  /// Falls back to a full restart if the server is not running.
+  Future<void> _refreshPreview() async {
+    if (_server == null || !_server!.isRunning) {
+      await _startServerAndLoad();
+      return;
     }
 
-    // Inline JS
-    final jsNode = _findFile(fileNodes, _kScriptJs);
-    if (jsNode != null) {
-      final js = await widget.contentRepository.readFile(
-        widget.project.id,
-        jsNode.id,
-      );
-      if (js.trim().isNotEmpty) {
-        result = result.replaceFirst(
-          '</body>',
-          '<script>\n$js\n</script>\n</body>',
-        );
-      }
-      result = result.replaceAll(
-        RegExp(r'<script[^>]+script\.js[^>]*>\s*</script>'),
-        '',
-      );
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    final url = Uri.parse(
+      'http://127.0.0.1:${_server!.boundPort}'
+      '/${widget.project.id.value}/$_kIndexHtml',
+    );
+    await _controller.loadRequest(url);
+  }
+
+  /// Graceful async stop for use between restarts.
+  Future<void> _stopServer() async {
+    try {
+      await _server?.stop();
+    } catch (e) {
+      debugPrint('Error stopping preview server: $e');
     }
-
-    return result;
+    _server = null;
   }
 
-  FileNode? _findFile(List<FileNode> fileNodes, String name) {
-    return fileNodes.where((f) => f.isFile && f.name == name).firstOrNull;
+  /// Synchronous fire-and-forget stop for use in dispose().
+  void _disposeServer() {
+    _server?.stop(force: true).catchError((_) {});
+    _server = null;
   }
+
+  @override
+  void dispose() {
+    _disposeServer();
+    super.dispose();
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +250,7 @@ class _WebPreviewViewState extends State<WebPreviewView> {
             key: const Key('preview_refresh_button'),
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Preview',
-            onPressed: _renderPreview,
+            onPressed: _refreshPreview,
           ),
           const SizedBox(width: 8),
         ],
@@ -239,6 +288,11 @@ class _WebPreviewViewState extends State<WebPreviewView> {
         message = 'index.html is empty.\n'
             'Add some HTML content and save to preview.';
         icon = Icons.note_outlined;
+      case 'server_failed':
+        message = 'Preview server could not start.\n'
+            'The local HTTP port may be in use. '
+            'Close other previews and try again.';
+        icon = Icons.cloud_off_outlined;
       case 'render_failed':
         message = 'Preview could not be rendered.\n'
             'Check your HTML for syntax errors and try again.';
@@ -270,7 +324,10 @@ class _WebPreviewViewState extends State<WebPreviewView> {
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('preview_retry_button'),
-              onPressed: _renderPreview,
+              onPressed: () {
+                _disposeServer();
+                _startServerAndLoad();
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),

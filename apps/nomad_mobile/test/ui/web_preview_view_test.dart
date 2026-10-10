@@ -43,7 +43,7 @@ class FakeFileContentRepository implements FileContentRepository {
   Future<void> deleteAllContentForProject(EntityId projectId) async {}
 }
 
-// ── Complete Headless Test Stub for WebViewPlatform ───────────────────
+// ── Complete Headless Test Stub for WebViewPlatform ─────────────────
 class TestWebViewPlatform extends WebViewPlatform {
   @override
   PlatformWebViewController createPlatformWebViewController(
@@ -69,6 +69,7 @@ class TestWebViewPlatform extends WebViewPlatform {
 
 class TestPlatformWebViewController extends PlatformWebViewController {
   PlatformNavigationDelegate? _delegate;
+  Uri? lastLoadedUri;
 
   TestPlatformWebViewController(super.params) : super.implementation();
 
@@ -94,6 +95,7 @@ class TestPlatformWebViewController extends PlatformWebViewController {
 
   @override
   Future<void> loadRequest(LoadRequestParams params) async {
+    lastLoadedUri = params.uri;
     if (_delegate is TestPlatformNavigationDelegate) {
       (_delegate as TestPlatformNavigationDelegate)
           .triggerPageFinished(params.uri.toString());
@@ -182,6 +184,7 @@ void main() {
             workspaceRepository: emptyWorkspaceRepo,
             contentRepository: contentRepo,
             previewVersion: 0,
+            serverPort: 0, // ephemeral port for safety
           ),
         ),
       );
@@ -203,6 +206,7 @@ void main() {
             workspaceRepository: workspaceRepo,
             contentRepository: contentRepo,
             previewVersion: 0,
+            serverPort: 0,
           ),
         ),
       );
@@ -225,6 +229,7 @@ void main() {
             workspaceRepository: workspaceRepo,
             contentRepository: contentRepo,
             previewVersion: 0,
+            serverPort: 0,
             onClose: () => closed = true,
           ),
         ),
@@ -239,7 +244,7 @@ void main() {
       expect(closed, isTrue);
     });
 
-    testWidgets('renders WebView surface when index.html contains valid markup',
+    testWidgets('starts server and loads the exact project URL over HTTP',
         (tester) async {
       contentRepo.contents['file-index'] =
           '<!DOCTYPE html><html><body><h1>Hello</h1></body></html>';
@@ -251,14 +256,67 @@ void main() {
             workspaceRepository: workspaceRepo,
             contentRepository: contentRepo,
             previewVersion: 0,
+            serverPort: 0, // ephemeral port
+          ),
+        ),
+      );
+
+      // Await server startup and URL load request
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('test_webview_surface')), findsOneWidget);
+      expect(find.textContaining('Preview — Web Lab Test'), findsOneWidget);
+
+      // Verify that loadRequest was called with our local server's URL scheme
+      final state =
+          tester.state<WebPreviewViewState>(find.byType(WebPreviewView));
+      // Fix: Cast the inner platform implementation, not the wrapper!
+      final controller =
+          state.controller.platform as TestPlatformWebViewController;
+
+      expect(controller.lastLoadedUri, isNotNull);
+      expect(controller.lastLoadedUri!.scheme, equals('http'));
+      expect(controller.lastLoadedUri!.host, equals('127.0.0.1'));
+      expect(controller.lastLoadedUri!.path, equals('/proj-123/index.html'));
+    });
+
+    testWidgets('cleans up server resources completely on dispose',
+        (tester) async {
+      contentRepo.contents['file-index'] = '<h1>Nomad</h1>';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WebPreviewView(
+            project: project,
+            workspaceRepository: workspaceRepo,
+            contentRepository: contentRepo,
+            previewVersion: 0,
+            serverPort: 0,
           ),
         ),
       );
 
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('test_webview_surface')), findsOneWidget);
-      expect(find.textContaining('Preview — Web Lab Test'), findsOneWidget);
+      final state =
+          tester.state<WebPreviewViewState>(find.byType(WebPreviewView));
+      final server = state.server;
+      expect(server, isNotNull);
+      expect(server!.isRunning, isTrue);
+
+      // Remove the widget from the tree to trigger dispose
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // Fix: Await the async socket close completion inside runAsync
+      await tester.runAsync(() async {
+        for (int i = 0; i < 20; i++) {
+          if (!server.isRunning) break;
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
+      });
+
+      // Verify the server is stopped and its socket is released
+      expect(server.isRunning, isFalse);
     });
   });
 
