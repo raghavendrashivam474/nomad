@@ -29,20 +29,34 @@ class InMemoryWorkspaceRepository implements WorkspaceRepository {
 }
 
 class InMemoryFileContentRepository implements FileContentRepository {
-  final Map<String, String> contents = {};
+  final Map<String, List<int>> _byteStorage = {};
 
   String _key(EntityId projectId, EntityId fileNodeId) =>
       '${projectId.value}_${fileNodeId.value}';
 
   @override
   Future<String> readFile(EntityId projectId, EntityId fileNodeId) async {
-    return contents[_key(projectId, fileNodeId)] ?? '';
+    final bytes = _byteStorage[_key(projectId, fileNodeId)];
+    if (bytes == null) return '';
+    return utf8.decode(bytes);
   }
 
   @override
   Future<void> writeFile(
       EntityId projectId, EntityId fileNodeId, String content) async {
-    contents[_key(projectId, fileNodeId)] = content;
+    _byteStorage[_key(projectId, fileNodeId)] = utf8.encode(content);
+  }
+
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    return _byteStorage[_key(projectId, fileNodeId)] ?? <int>[];
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    _byteStorage[_key(projectId, fileNodeId)] = List<int>.from(bytes);
   }
 
   @override
@@ -63,7 +77,6 @@ void main() {
   const project1 = EntityId('p1');
   const project2 = EntityId('p2');
 
-  // Use dynamic/test-friendly port (0 assigns an ephemeral free port)
   setUp(() {
     workspaceRepo = InMemoryWorkspaceRepository();
     contentRepo = InMemoryFileContentRepository();
@@ -203,6 +216,92 @@ void main() {
           equals('application/javascript; charset=utf-8'));
       final body = await utf8.decoder.bind(res).join();
       expect(body, equals('export const version = "1.0";'));
+    });
+
+    test('serves binary PNG file with exact bytes and correct Content-Type',
+        () async {
+      final imgDir = addNode(
+          id: 'dir-img',
+          projectId: project1,
+          name: 'img',
+          type: FileNodeType.folder);
+      final imgNode = addNode(
+          id: 'img-png',
+          projectId: project1,
+          parentId: imgDir.id.value,
+          name: 'avatar.png',
+          type: FileNodeType.file);
+
+      final pngBytes = <int>[
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+        0x0D,
+        0x0A,
+        0x1A,
+        0x0A,
+        0x00,
+        0x00,
+        0x00,
+        0x0D,
+        0x49,
+        0x48,
+        0x44,
+        0x52,
+        0xFF,
+        0x00,
+        0xEE,
+        0x11,
+        0xAA,
+        0xBB,
+        0xCC,
+        0xDD,
+      ];
+      await contentRepo.writeFileBytes(project1, imgNode.id, pngBytes);
+
+      await server.start();
+      final req = await httpClient.getUrl(
+          Uri.parse('http://127.0.0.1:${server.boundPort}/p1/img/avatar.png'));
+      final res = await req.close();
+
+      expect(res.statusCode, equals(HttpStatus.ok));
+      expect(res.headers.value(HttpHeaders.contentTypeHeader),
+          equals('image/png'));
+      expect(res.headers.value(HttpHeaders.cacheControlHeader),
+          equals('no-cache, no-store, must-revalidate'));
+
+      final receivedBytes = <int>[];
+      await for (final chunk in res) {
+        receivedBytes.addAll(chunk);
+      }
+
+      expect(receivedBytes, equals(pngBytes));
+    });
+
+    test('serves HEAD request with headers but no body', () async {
+      final imgNode = addNode(
+          id: 'img-head',
+          projectId: project1,
+          name: 'photo.jpg',
+          type: FileNodeType.file);
+      final jpgBytes = <int>[0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+      await contentRepo.writeFileBytes(project1, imgNode.id, jpgBytes);
+
+      await server.start();
+      final req = await httpClient.headUrl(
+          Uri.parse('http://127.0.0.1:${server.boundPort}/p1/photo.jpg'));
+      final res = await req.close();
+
+      expect(res.statusCode, equals(HttpStatus.ok));
+      expect(res.headers.value(HttpHeaders.contentTypeHeader),
+          equals('image/jpeg'));
+
+      final receivedBytes = <int>[];
+      await for (final chunk in res) {
+        receivedBytes.addAll(chunk);
+      }
+      expect(receivedBytes, isEmpty);
     });
 
     test('returns 404 for missing resources', () async {

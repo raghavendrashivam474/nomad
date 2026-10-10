@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/server/project_file_resolver.dart';
 
-// Simple in-memory fakes for tests
 class FakeWorkspaceRepository implements WorkspaceRepository {
   final List<FileNode> nodes = [];
 
@@ -28,20 +27,34 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
 }
 
 class FakeFileContentRepository implements FileContentRepository {
-  final Map<String, String> contents = {};
+  final Map<String, List<int>> _byteStorage = {};
 
   String _key(EntityId projectId, EntityId fileNodeId) =>
       '${projectId.value}_${fileNodeId.value}';
 
   @override
   Future<String> readFile(EntityId projectId, EntityId fileNodeId) async {
-    return contents[_key(projectId, fileNodeId)] ?? '';
+    final bytes = _byteStorage[_key(projectId, fileNodeId)];
+    if (bytes == null) return '';
+    return utf8.decode(bytes);
   }
 
   @override
   Future<void> writeFile(
       EntityId projectId, EntityId fileNodeId, String content) async {
-    contents[_key(projectId, fileNodeId)] = content;
+    _byteStorage[_key(projectId, fileNodeId)] = utf8.encode(content);
+  }
+
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    return _byteStorage[_key(projectId, fileNodeId)] ?? <int>[];
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    _byteStorage[_key(projectId, fileNodeId)] = List<int>.from(bytes);
   }
 
   @override
@@ -174,6 +187,64 @@ void main() {
       expect(utf8.decode(success.bytes), equals('body { color: red; }'));
     });
 
+    test('resolves binary assets intact without corruption', () async {
+      final imgFolder = makeNode(
+          id: 'dir-img',
+          projectId: projectA,
+          name: 'images',
+          type: FileNodeType.folder);
+      final logoPng = makeNode(
+          id: 'f-png',
+          projectId: projectA,
+          parentId: 'dir-img',
+          name: 'logo.png',
+          type: FileNodeType.file);
+      workspaceRepo.nodes.addAll([imgFolder, logoPng]);
+
+      final rawImageBytes = <int>[
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+        0x0D,
+        0x0A,
+        0x1A,
+        0x0A,
+        0x00,
+        0x00,
+        0x00,
+        0x0D,
+        0x49,
+        0x48,
+        0x44,
+        0x52,
+        0x00,
+        0x00,
+        0x00,
+        0x20,
+        0x00,
+        0x00,
+        0x00,
+        0x20,
+        0xFF,
+        0xFE,
+        0x00,
+        0x00,
+        0xAA,
+        0xBB,
+        0xCC,
+        0xDD,
+      ];
+
+      await contentRepo.writeFileBytes(projectA, logoPng.id, rawImageBytes);
+
+      final res = await resolver.resolve(projectA, 'images/logo.png');
+      expect(res, isA<FileResolutionSuccess>());
+      final success = res as FileResolutionSuccess;
+      expect(success.node.id, equals(logoPng.id));
+      expect(success.bytes, equals(rawImageBytes));
+    });
+
     test('returns targetIsDirectory when path points to a folder', () async {
       final cssFolder = makeNode(
           id: 'dir1',
@@ -211,7 +282,6 @@ void main() {
     });
 
     test('enforces strict project boundary isolation', () async {
-      // Create identical file names in Project A and Project B
       final nodeA = makeNode(
           id: 'f-a',
           projectId: projectA,
@@ -227,13 +297,11 @@ void main() {
       await contentRepo.writeFile(projectA, nodeA.id, 'A_CSS');
       await contentRepo.writeFile(projectB, nodeB.id, 'B_CSS');
 
-      // Querying with projectA must only return Project A content
       final resA = await resolver.resolve(projectA, 'style.css');
       expect(resA, isA<FileResolutionSuccess>());
       expect(
           utf8.decode((resA as FileResolutionSuccess).bytes), equals('A_CSS'));
 
-      // Querying with projectB must only return Project B content
       final resB = await resolver.resolve(projectB, 'style.css');
       expect(resB, isA<FileResolutionSuccess>());
       expect(
