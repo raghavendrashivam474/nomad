@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Noisy</title></head>
+<body>
+  <script>
+    for (var i = 0; i < 300; i++) {
+      if (window.NomadDiag) {
+        NomadDiag.postMessage(JSON.stringify({
+          level: "info",
+          message: "Noisy event " + i,
+          source: "noisy.html"
+        }));
+      }
+    }
+  </script>
+</body>
+</html>

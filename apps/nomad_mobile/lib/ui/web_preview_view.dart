@@ -1,12 +1,13 @@
-﻿/// Web Lab preview surface for Nomad.
+/// Web Lab preview surface for Nomad.
 library;
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-
+import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/activity/activity_controller.dart';
 import 'package:nomad_mobile/activity/activity_event.dart';
-import 'package:nomad_core/nomad_core.dart';
+import 'package:nomad_mobile/ui/activity/live_activity_panel.dart';
 import '../server/project_file_server.dart';
 import '../server/project_file_resolver.dart';
 
@@ -23,8 +24,13 @@ class WebPreviewView extends StatefulWidget {
   /// Pass 0 in tests to get an ephemeral port.
   final int serverPort;
 
+  /// Optional activity controller for Live Activity event reporting.
+  final ActivityController? activityController;
+
+  /// Optional callback to navigate to source file/line from an activity event.
+  final void Function(String sourceUri, int? line, int? column)? onNavigateToSource;
+
   const WebPreviewView({
-    this.activityController,
     super.key,
     required this.project,
     required this.workspaceRepository,
@@ -32,8 +38,9 @@ class WebPreviewView extends StatefulWidget {
     required this.previewVersion,
     this.onClose,
     this.serverPort = 18080,
-  });  /// Optional activity controller for Live Activity event reporting.
-  final ActivityController? activityController;
+    this.activityController,
+    this.onNavigateToSource,
+  });
 
   @override
   State<WebPreviewView> createState() => WebPreviewViewState();
@@ -63,37 +70,44 @@ class WebPreviewViewState extends State<WebPreviewView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
-        widget.activityController?.beginSession();        _reportActivity(
-          category: ActivityCategory.lifecycle,
-          severity: ActivitySeverity.info,
-          message: 'Preview loading...',
-          details: url,
-        );
+            widget.activityController?.beginSession();
+            _reportActivity(
+              category: ActivityCategory.lifecycle,
+              severity: ActivitySeverity.info,
+              message: 'Preview loading...',
+              details: url,
+            );
             if (mounted) setState(() => _isLoading = true);
           },
           onPageFinished: (url) {
-        _reportActivity(
-          category: ActivityCategory.lifecycle,
-          severity: ActivitySeverity.info,
-          message: 'Preview ready',
-          details: url,
-        );
+            _reportActivity(
+              category: ActivityCategory.lifecycle,
+              severity: ActivitySeverity.info,
+              message: 'Preview ready',
+              details: url,
+            );
             if (mounted) setState(() => _isLoading = false);
           },
           onWebResourceError: (err) {
             debugPrint('WebView resource error: ${err.description}');
-        _reportActivity(
-          category: ActivityCategory.resource,
-          severity: err.isForMainFrame == true
-              ? ActivitySeverity.error
-              : ActivitySeverity.warning,
-          message: 'Resource error: ${err.description}',
-          details: 'URL: ${err.url ?? "unknown"}, '
-              'type: ${err.errorType}, '
-              'mainFrame: ${err.isForMainFrame}',
-        );
+            _reportActivity(
+              category: ActivityCategory.resource,
+              severity: err.isForMainFrame == true
+                  ? ActivitySeverity.error
+                  : ActivitySeverity.warning,
+              message: 'Resource error: ${err.description}',
+              details: 'URL: ${err.url ?? "unknown"}, '
+                  'type: ${err.errorType}, '
+                  'mainFrame: ${err.isForMainFrame}',
+            );
           },
         ),
+      )
+      ..addJavaScriptChannel(
+        'NomadDiag',
+        onMessageReceived: (JavaScriptMessage msg) {
+          _handleJavaScriptDiagnostic(msg.message);
+        },
       );
     _startServerAndLoad();
   }
@@ -102,18 +116,18 @@ class WebPreviewViewState extends State<WebPreviewView> {
   void didUpdateWidget(covariant WebPreviewView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project.id != widget.project.id) {
-      // Project changed â€” tear down old server, start fresh.
+      // Project changed — tear down old server, start fresh.
       _disposeServer();
       _startServerAndLoad();
     } else if (oldWidget.previewVersion != widget.previewVersion) {
-      // Same project, content saved â€” reload over existing server.
+      // Same project, content saved — reload over existing server.
       _refreshPreview();
     }
   }
 
-  // â”€â”€ Server lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Server lifecycle ────────────────────────────────────────────────────────
 
-  /// Full startup sequence: pre-check â†’ start server â†’ load URL.
+  /// Full startup sequence: pre-check → start server → load URL.
   Future<void> _startServerAndLoad() async {
     final token = ++_loadToken;
 
@@ -178,6 +192,18 @@ class WebPreviewViewState extends State<WebPreviewView> {
       _server = ProjectFileServer(
         resolver: resolver,
         port: widget.serverPort,
+        onResolutionFailure: (path, failure) {
+          _reportActivity(
+            category: ActivityCategory.resource,
+            severity: failure.errorType == FileResolutionErrorType.invalidPath ||
+                    failure.errorType == FileResolutionErrorType.pathTraversal
+                ? ActivitySeverity.error
+                : ActivitySeverity.warning,
+            message: 'Resource failed: $path',
+            details: failure.message,
+            sourceUri: path,
+          );
+        },
       );
       await _server!.start();
     } catch (e) {
@@ -241,15 +267,14 @@ class WebPreviewViewState extends State<WebPreviewView> {
     super.dispose();
   }
 
-  // â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  /// Emit an activity event if the controller is available.
-  /// Silently no-ops when no controller is provided, keeping the
-  /// preview fully functional without Live Activity.
   void _reportActivity({
     required ActivityCategory category,
     required ActivitySeverity severity,
     required String message,
     String? details,
+    String? sourceUri,
+    int? line,
+    int? column,
   }) {
     final controller = widget.activityController;
     if (controller == null) return;
@@ -258,8 +283,71 @@ class WebPreviewViewState extends State<WebPreviewView> {
       severity: severity,
       message: message,
       details: details,
+      sourceUri: sourceUri,
+      line: line,
+      column: column,
     ));
   }
+
+  /// Parse and validate JavaScript error diagnostic messages.
+  /// Enforces schema and maximum size limits to protect architecture.
+  void _handleJavaScriptDiagnostic(String rawJson) {
+    if (rawJson.length > 4096) return;
+
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is! Map<String, dynamic>) return;
+
+      final message = decoded['message'] as String?;
+      if (message == null || message.trim().isEmpty) return;
+
+      final level = decoded['level'] as String?;
+      final severity =
+          level == 'warn' ? ActivitySeverity.warning : ActivitySeverity.error;
+
+      final details = decoded['details'] as String?;
+      final source = decoded['source'] as String?;
+      final line = decoded['line'] as int?;
+      final column = decoded['column'] as int?;
+
+      _reportActivity(
+        category: ActivityCategory.runtime,
+        severity: severity,
+        message: message,
+        details: details,
+        sourceUri: source,
+        line: line,
+        column: column,
+      );
+    } catch (_) {
+      // Ignore malformed payloads to protect app stability
+    }
+  }
+
+  void _showActivitySheet() {
+    if (widget.activityController == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.65,
+          child: LiveActivityPanel(
+            controller: widget.activityController!,
+            onClose: () => Navigator.of(ctx).pop(),
+            onNavigateToSource: (uri, line, col) {
+              Navigator.of(ctx).pop();
+              widget.onNavigateToSource?.call(uri, line, col);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +368,7 @@ class WebPreviewViewState extends State<WebPreviewView> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Preview â€” ${widget.project.name}',
+                'Preview — ${widget.project.name}',
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 16,
@@ -291,6 +379,23 @@ class WebPreviewViewState extends State<WebPreviewView> {
           ],
         ),
         actions: [
+          if (widget.activityController != null)
+            ListenableBuilder(
+              listenable: widget.activityController!,
+              builder: (context, _) {
+                final count = widget.activityController!.length;
+                return IconButton(
+                  key: const Key('preview_activity_button'),
+                  icon: Badge(
+                    isLabelVisible: count > 0,
+                    label: Text('$count'),
+                    child: const Icon(Icons.bolt),
+                  ),
+                  tooltip: 'Live Activity',
+                  onPressed: _showActivitySheet,
+                );
+              },
+            ),
           IconButton(
             key: const Key('preview_refresh_button'),
             icon: const Icon(Icons.refresh),

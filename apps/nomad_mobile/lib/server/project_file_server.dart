@@ -11,12 +11,18 @@ class ProjectFileServer {
   final ProjectFileResolver resolver;
   final int port;
 
+  /// Optional callback invoked when a requested file fails resolution.
+  /// Used by Live Activity to capture server-side resource issues.
+  final void Function(String requestPath, FileResolutionFailure failure)?
+      onResolutionFailure;
+
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _subscription;
 
   ProjectFileServer({
     required this.resolver,
     this.port = 18080,
+    this.onResolutionFailure,
   });
 
   /// Whether the server is currently bound and listening.
@@ -113,6 +119,8 @@ class ProjectFileServer {
         }
         await response.close();
       } else if (result is FileResolutionFailure) {
+        onResolutionFailure?.call(uriPath, result);
+
         if (result.errorType == FileResolutionErrorType.invalidPath ||
             result.errorType == FileResolutionErrorType.pathTraversal) {
           response.statusCode = HttpStatus.forbidden;

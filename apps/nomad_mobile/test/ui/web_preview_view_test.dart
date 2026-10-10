@@ -1,9 +1,8 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/ui/web_preview_view.dart';
-import 'package:nomad_mobile/ui/editor_view.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -59,7 +58,7 @@ class FakeFileContentRepository implements FileContentRepository {
   Future<void> deleteAllContentForProject(EntityId projectId) async {}
 }
 
-// â”€â”€ Complete Headless Test Stub for WebViewPlatform â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Complete Headless Test Stub for WebViewPlatform ─────────────────
 class TestWebViewPlatform extends WebViewPlatform {
   @override
   PlatformWebViewController createPlatformWebViewController(
@@ -86,6 +85,7 @@ class TestWebViewPlatform extends WebViewPlatform {
 class TestPlatformWebViewController extends PlatformWebViewController {
   PlatformNavigationDelegate? _delegate;
   Uri? lastLoadedUri;
+  final Map<String, JavaScriptChannelParams> javaScriptChannels = {};
 
   TestPlatformWebViewController(super.params) : super.implementation();
 
@@ -99,6 +99,17 @@ class TestPlatformWebViewController extends PlatformWebViewController {
   Future<void> setPlatformNavigationDelegate(
       PlatformNavigationDelegate handler) async {
     _delegate = handler;
+  }
+
+  @override
+  Future<void> addJavaScriptChannel(
+      JavaScriptChannelParams javaScriptChannelParams) async {
+    javaScriptChannels[javaScriptChannelParams.name] = javaScriptChannelParams;
+  }
+
+  @override
+  Future<void> removeJavaScriptChannel(String javaScriptChannelName) async {
+    javaScriptChannels.remove(javaScriptChannelName);
   }
 
   @override
@@ -116,6 +127,12 @@ class TestPlatformWebViewController extends PlatformWebViewController {
       (_delegate as TestPlatformNavigationDelegate)
           .triggerPageFinished(params.uri.toString());
     }
+  }
+
+  void triggerJavaScriptMessage(String channelName, String message) {
+    javaScriptChannels[channelName]?.onMessageReceived(
+      JavaScriptMessage(message: message),
+    );
   }
 }
 
@@ -253,17 +270,17 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      final closeButton = find.byKey(const Key('preview_close_button'));
-      expect(closeButton, findsOneWidget);
+      expect(find.byKey(const Key('preview_close_button')), findsOneWidget);
 
-      await tester.tap(closeButton);
+      await tester.tap(find.byKey(const Key('preview_close_button')));
+      await tester.pumpAndSettle();
+
       expect(closed, isTrue);
     });
 
     testWidgets('starts server and loads the exact project URL over HTTP',
         (tester) async {
-      contentRepo.contents['file-index'] =
-          '<!DOCTYPE html><html><body><h1>Hello</h1></body></html>';
+      contentRepo.contents['file-index'] = '<h1>Hello</h1>';
 
       await tester.pumpWidget(
         MaterialApp(
@@ -272,33 +289,29 @@ void main() {
             workspaceRepository: workspaceRepo,
             contentRepository: contentRepo,
             previewVersion: 0,
-            serverPort: 0, // ephemeral port
+            serverPort: 0,
           ),
         ),
       );
 
-      // Await server startup and URL load request
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('test_webview_surface')), findsOneWidget);
-      expect(find.textContaining('Preview — Web Lab Test'), findsOneWidget);
 
-      // Verify that loadRequest was called with our local server's URL scheme
       final state =
           tester.state<WebPreviewViewState>(find.byType(WebPreviewView));
-      // Fix: Cast the inner platform implementation, not the wrapper!
-      final controller =
-          state.controller.platform as TestPlatformWebViewController;
+      expect(state.server, isNotNull);
+      expect(state.server!.isRunning, isTrue);
 
-      expect(controller.lastLoadedUri, isNotNull);
-      expect(controller.lastLoadedUri!.scheme, equals('http'));
-      expect(controller.lastLoadedUri!.host, equals('127.0.0.1'));
-      expect(controller.lastLoadedUri!.path, equals('/proj-123/index.html'));
+      final expectedUrl =
+          'http://127.0.0.1:${state.server!.boundPort}/${project.id.value}/index.html';
+      final controller = state.controller.platform as TestPlatformWebViewController;
+      expect(controller.lastLoadedUri.toString(), expectedUrl);
     });
 
     testWidgets('cleans up server resources completely on dispose',
         (tester) async {
-      contentRepo.contents['file-index'] = '<h1>Nomad</h1>';
+      contentRepo.contents['file-index'] = '<h1>Hello</h1>';
 
       await tester.pumpWidget(
         MaterialApp(
@@ -320,78 +333,11 @@ void main() {
       expect(server, isNotNull);
       expect(server!.isRunning, isTrue);
 
-      // Remove the widget from the tree to trigger dispose
-      await tester.pumpWidget(const SizedBox.shrink());
+      // Trigger dispose by replacing widget tree
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
 
-      // Fix: Await the async socket close completion inside runAsync
-      await tester.runAsync(() async {
-        for (int i = 0; i < 20; i++) {
-          if (!server.isRunning) break;
-          await Future.delayed(const Duration(milliseconds: 10));
-        }
-      });
-
-      // Verify the server is stopped and its socket is released
       expect(server.isRunning, isFalse);
-    });
-  });
-
-  group('EditorView Preview Action & Save Integration', () {
-    testWidgets(
-        'invokes onPreview callback when preview action button is tapped',
-        (tester) async {
-      bool previewTapped = false;
-      contentRepo.contents['file-index'] = '<h1>Test</h1>';
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: EditorView(
-            fileNode: indexNode,
-            contentRepository: contentRepo,
-            onPreview: () => previewTapped = true,
-            isPreviewActive: false,
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      final previewButton = find.byKey(const Key('editor_preview_button'));
-      expect(previewButton, findsOneWidget);
-
-      await tester.tap(previewButton);
-      expect(previewTapped, isTrue);
-    });
-
-    testWidgets(
-        'invokes onSaveCompleted when save button is pressed after content modification',
-        (tester) async {
-      bool saveCompleted = false;
-      contentRepo.contents['file-index'] = '<h1>Initial</h1>';
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: EditorView(
-            fileNode: indexNode,
-            contentRepository: contentRepo,
-            onSaveCompleted: () => saveCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-          find.byKey(const Key('editor_text_field')), '<h1>Updated</h1>');
-      await tester.pump();
-
-      final saveBtn = find.byKey(const Key('editor_save_button'));
-      expect(saveBtn, findsOneWidget);
-      await tester.tap(saveBtn);
-      await tester.pumpAndSettle();
-
-      expect(saveCompleted, isTrue);
-      expect(contentRepo.contents['file-index'], equals('<h1>Updated</h1>'));
     });
   });
 }

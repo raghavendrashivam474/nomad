@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><title>Throws</title></head>
+<body>
+  <h1>Triggering JS Error</h1>
+  <script>
+    try {
+      throw new ReferenceError("testVariable is not defined");
+    } catch (e) {
+      if (window.NomadDiag) {
+        NomadDiag.postMessage(JSON.stringify({
+          level: "error",
+          message: e.toString(),
+          details: e.stack || "",
+          source: "index.html",
+          line: 7,
+          column: 13
+        }));
+      }
+    }
+  </script>
+</body>
+</html>
