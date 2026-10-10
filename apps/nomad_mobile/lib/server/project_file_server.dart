@@ -1,11 +1,11 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'mime_type_resolver.dart';
 import 'project_file_resolver.dart';
 
 /// Embedded HTTP server that serves project workspace files to local clients (e.g. WebView).
-/// 
+///
 /// Strictly binds to loopback IPv4 (127.0.0.1) and enforces project path scoping.
 class ProjectFileServer {
   final ProjectFileResolver resolver;
@@ -26,7 +26,7 @@ class ProjectFileServer {
   int? get boundPort => _server?.port;
 
   /// Starts the server on 127.0.0.1:[port].
-  /// 
+  ///
   /// Throws [SocketException] if the port cannot be bound.
   Future<void> start() async {
     if (isRunning) return;
@@ -49,10 +49,13 @@ class ProjectFileServer {
 
   /// Stops the server and releases the bound socket.
   Future<void> stop({bool force = false}) async {
-    await _subscription?.cancel();
+    final sub = _subscription;
     _subscription = null;
-    await _server?.close(force: force);
+    final server = _server;
     _server = null;
+
+    await sub?.cancel();
+    await server?.close(force: force);
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
@@ -91,14 +94,16 @@ class ProjectFileServer {
       }
 
       final logicalPath = logicalSegments.join('/');
-      final result = await resolver.resolve(EntityId(projectIdStr), logicalPath);
+      final result =
+          await resolver.resolve(EntityId(projectIdStr), logicalPath);
 
       if (result is FileResolutionSuccess) {
         final mimeTypeStr = MimeTypeResolver.resolve(result.node.name);
         response.statusCode = HttpStatus.ok;
         response.headers.set(HttpHeaders.contentTypeHeader, mimeTypeStr);
-        response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache, no-store, must-revalidate');
-        
+        response.headers.set(HttpHeaders.cacheControlHeader,
+            'no-cache, no-store, must-revalidate');
+
         if (request.method == 'GET') {
           response.add(result.bytes);
         }
