@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:nomad_core/nomad_core.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -42,6 +43,32 @@ class LocalFileContentRepository implements FileContentRepository {
       file.writeAsStringSync(content);
     } catch (e) {
       throw DomainException('Failed to write file content', cause: e);
+    }
+  }
+
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      if (file.existsSync()) {
+        return file.readAsBytesSync();
+      }
+      return <int>[];
+    } catch (e) {
+      throw DomainException('Failed to read file bytes', cause: e);
+    }
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      file.createSync(recursive: true);
+      file.writeAsBytesSync(bytes);
+    } catch (e) {
+      throw DomainException('Failed to write file bytes', cause: e);
     }
   }
 
