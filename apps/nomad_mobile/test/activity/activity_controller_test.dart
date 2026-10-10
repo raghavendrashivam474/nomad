@@ -1,14 +1,14 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_mobile/activity/activity_controller.dart';
 import 'package:nomad_mobile/activity/activity_event.dart';
 
 void main() {
   late ActivityController sut;
-  var _idCounter = 0;
+  var idCounter = 0;
 
   setUp(() {
     sut = ActivityController(maxEvents: 5);
-    _idCounter = 0;
+    idCounter = 0;
   });
 
   tearDown(() {
@@ -17,19 +17,19 @@ void main() {
 
   // ── Helpers ────────────────────────────────────────────────
 
-  ActivityEvent _makeEvent({
+  ActivityEvent makeEvent({
     String? message,
     ActivityCategory category = ActivityCategory.lifecycle,
     ActivitySeverity severity = ActivitySeverity.info,
     int? sessionId,
   }) {
-    _idCounter++;
+    idCounter++;
     return ActivityEvent(
-      id: 'test-$_idCounter',
+      id: 'test-$idCounter',
       timestamp: DateTime.now(),
       category: category,
       severity: severity,
-      message: message ?? 'test-$_idCounter',
+      message: message ?? 'test-$idCounter',
       sessionId: sessionId ?? sut.currentSessionId,
     );
   }
@@ -49,7 +49,7 @@ void main() {
 
     test('beginSession does not clear events', () {
       sut.beginSession();
-      sut.add(_makeEvent());
+      sut.add(makeEvent());
       expect(sut.length, 1);
 
       sut.beginSession();
@@ -65,7 +65,7 @@ void main() {
       var notified = 0;
       sut.addListener(() => notified++);
 
-      sut.add(_makeEvent(message: 'hello'));
+      sut.add(makeEvent(message: 'hello'));
 
       expect(sut.length, 1);
       expect(sut.events.first.message, 'hello');
@@ -74,18 +74,18 @@ void main() {
 
     test('rejects stale session events silently', () {
       sut.beginSession(); // session 1
-      sut.add(_makeEvent());
+      sut.add(makeEvent());
       expect(sut.length, 1);
 
       sut.beginSession(); // session 2
-      sut.add(_makeEvent(sessionId: 1));
+      sut.add(makeEvent(sessionId: 1));
       expect(sut.length, 1);
     });
 
     test('evicts oldest when exceeding maxEvents', () {
       sut.beginSession();
       for (var i = 0; i < 7; i++) {
-        sut.add(_makeEvent(message: 'msg-$i'));
+        sut.add(makeEvent(message: 'msg-$i'));
       }
 
       expect(sut.length, 5);
@@ -101,7 +101,7 @@ void main() {
     test('preserves newest events on eviction', () {
       sut.beginSession();
       for (var i = 0; i < 10; i++) {
-        sut.add(_makeEvent(
+        sut.add(makeEvent(
           message: 'ev-$i',
           severity: i == 9 ? ActivitySeverity.error : ActivitySeverity.info,
         ));
@@ -170,7 +170,7 @@ void main() {
   group('dismiss', () {
     test('removes event by id and notifies', () {
       sut.beginSession();
-      final e = _makeEvent(message: 'doomed');
+      final e = makeEvent(message: 'doomed');
       sut.add(e);
       expect(sut.length, 1);
 
@@ -193,9 +193,9 @@ void main() {
 
     test('only removes the targeted event', () {
       sut.beginSession();
-      final a = _makeEvent(message: 'keep');
-      final b = _makeEvent(message: 'remove');
-      final c = _makeEvent(message: 'keep-too');
+      final a = makeEvent(message: 'keep');
+      final b = makeEvent(message: 'remove');
+      final c = makeEvent(message: 'keep-too');
       sut.add(a);
       sut.add(b);
       sut.add(c);
@@ -211,8 +211,8 @@ void main() {
   group('clear', () {
     test('removes all events and notifies', () {
       sut.beginSession();
-      sut.add(_makeEvent());
-      sut.add(_makeEvent());
+      sut.add(makeEvent());
+      sut.add(makeEvent());
       expect(sut.length, 2);
 
       var notified = 0;
@@ -232,7 +232,7 @@ void main() {
 
     test('does not reset session', () {
       sut.beginSession();
-      sut.add(_makeEvent());
+      sut.add(makeEvent());
       sut.clear();
       expect(sut.currentSessionId, 1);
     });
@@ -243,7 +243,7 @@ void main() {
   group('dispose', () {
     test('can be disposed without error', () {
       sut.beginSession();
-      sut.add(_makeEvent());
+      sut.add(makeEvent());
       // tearDown will call dispose — just verify no throw up to here
       expect(sut.length, 1);
     });
