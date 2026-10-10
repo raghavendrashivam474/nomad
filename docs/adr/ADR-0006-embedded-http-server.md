@@ -258,3 +258,34 @@ MF-1 established the standalone `ProjectFileServer` and `ProjectFileResolver`. M
    - `WebPreviewView` accepts an optional `serverPort` parameter (default `18080`).
    - In automated widget test suites, `serverPort: 0` is passed to allow OS-assigned ephemeral ports, eliminating port collisions in concurrent test runners.
    - `WebPreviewViewState` was made public with read-only getters for `controller` and `server` to allow deterministic integration testing.
+
+---
+
+## Amendment: MF-3 Binary Safety & MF-4 Reliability Hardening (2025-07-15)
+
+### Context & Problem
+While MF-1 and MF-2 established the loopback resource server and WebView integration, two distinct limitations remained:
+1. **Binary Corruption:** Serving binary assets (such as PNGs, JPEGs, SVGs, and fonts) was blocked by the string-based `FileContentRepository` contract.
+2. **Lifecycle & Concurrency Safety:** High concurrent load, race conditions during startup/shutdown sequences, and missing `Content-Length` headers compromised reliability.
+
+### Decisions Made & Implemented
+
+1. **Binary-Safe serving path (MF-3):**
+   - Implemented `readFileBytes` and `writeFileBytes` in the storage contract (ADR-0007).
+   - Upgraded `ProjectFileResolver` to retrieve contents via `readFileBytes` and return raw `List<int>` bytes instead of UTF-8 encoded text.
+   - Updated MIME mapping array to 14 standard web formats (adding `mjs` and verification for image formats).
+
+2. **Atomic Server Initialization (MF-4):**
+   - Prevented race conditions on startup by ensuring the `HttpServer` binding and its stream subscription assignment happen atomically.
+   - The internal `_server` and `_subscription` properties remain `null` until both operations succeed, preventing the server from being reported as `isRunning` in a partially active state.
+
+3. **HTTP Header Improvements (MF-4):**
+   - Added explicit `Content-Length` headers to all success paths (GET and HEAD requests). This prevents chunked-encoding overhead in WebViews, allows the browser to know file sizes beforehand, and adheres to RFC 9110 §9.3.2 standards.
+
+4. **Robust Error Handling (MF-4):**
+   - Added automated tests verifying occupied-port bind failures (throwing `SocketException` cleanly without leaking sockets) and recovery when ports are released.
+   - Verified concurrency request integrity under high stress (simultaneous text/binary loads).
+   - Checked lifecycle stability (start/stop stress test) to ensure loopback binds are cleanly released and re-bound instantly.
+
+### Status
+**Finalized & Closed** — Verified by 117 automated integration tests with 100% success rate and zero analyzer issues.
