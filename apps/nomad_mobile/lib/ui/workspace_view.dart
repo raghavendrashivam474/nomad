@@ -243,36 +243,32 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          RadioListTile<EntityId?>(
-                            key: const Key('move_dest_root'),
-                            title: const Text('/ (Workspace Root)'),
-                            value: null,
-                            groupValue:
-                                selectedTargetId, // ignore: deprecated_member_use
-                            onChanged: node.parentId ==
-                                    null // ignore: deprecated_member_use
-                                ? null // Already at root
-                                : (val) => setDialogState(() =>
-                                    selectedTargetId =
-                                        val), // ignore: deprecated_member_use
+                                                    RadioGroup<EntityId?>(
+                            groupValue: selectedTargetId,
+                            onChanged: (val) =>
+                                setDialogState(() => selectedTargetId = val),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                RadioListTile<EntityId?>(
+                                  key: const Key('move_dest_root'),
+                                  title: const Text('/ (Workspace Root)'),
+                                  value: null,
+                                  enabled: node.parentId != null,
+                                ),
+                                ...targetFolders.map((folder) {
+                                  final isCurrentParent = node.parentId == folder.id;
+                                  return RadioListTile<EntityId?>(
+                                    key: Key('move_dest_${folder.name}'),
+                                    title: Text(folder.name),
+                                    secondary: const Icon(Icons.folder_outlined),
+                                    value: folder.id,
+                                    enabled: !isCurrentParent,
+                                  );
+                                }),
+                              ],
+                            ),
                           ),
-                          ...targetFolders.map((folder) {
-                            final isCurrentParent = node.parentId == folder.id;
-                            return RadioListTile<EntityId?>(
-                              key: Key('move_dest_${folder.name}'),
-                              title: Text(folder.name),
-                              secondary: const Icon(Icons.folder_outlined),
-                              value: folder.id,
-                              groupValue:
-                                  selectedTargetId, // ignore: deprecated_member_use
-                              onChanged:
-                                  isCurrentParent // ignore: deprecated_member_use
-                                      ? null
-                                      : (val) => setDialogState(() =>
-                                          selectedTargetId =
-                                              val), // ignore: deprecated_member_use
-                            );
-                          }),
                         ],
                       ),
                     ),
