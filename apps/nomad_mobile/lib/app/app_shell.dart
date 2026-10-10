@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../activity/activity_controller.dart';
 import '../branding/nomad_brand.dart';
 import '../branding/nomad_logo_widget.dart';
 import '../ui/editor_view.dart';
@@ -38,6 +39,14 @@ class _AppShellState extends State<AppShell> {
   int _previewVersion = 0;
   double _explorerWidth = kDefaultExplorerWidth;
 
+  final ActivityController _activityController = ActivityController();
+
+  @override
+  void dispose() {
+    _activityController.dispose();
+    super.dispose();
+  }
+
   void _onFileSelected(FileNode node) {
     setState(() {
       if (!_openTabs.any((t) => t.id == node.id)) {
@@ -65,6 +74,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onProjectDeselected() {
+    _activityController.clear();
     setState(() {
       _selectedProject = null;
       _openTabs.clear();
@@ -94,6 +104,27 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  Future<void> _navigateToSource(String sourceUri, int? line, int? column) async {
+    if (_selectedProject == null) return;
+    try {
+      final nodes = await widget.workspaceRepository
+          .getNodesForProject(_selectedProject!.id);
+
+      final filename = sourceUri.split('/').where((s) => s.isNotEmpty).lastOrNull ?? sourceUri;
+      final targetNode = nodes.where((n) => n.isFile && n.name == filename).firstOrNull;
+
+      if (targetNode != null) {
+        setState(() {
+          _onFileSelected(targetNode);
+          // On phone layout, close preview to reveal editor
+          _showPreview = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to navigate to source: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -108,6 +139,8 @@ class _AppShellState extends State<AppShell> {
             workspaceRepository: widget.workspaceRepository,
             contentRepository: widget.contentRepository,
             previewVersion: _previewVersion,
+            activityController: _activityController,
+            onNavigateToSource: _navigateToSource,
             onClose: () => setState(() => _showPreview = false),
           );
         }
@@ -314,6 +347,8 @@ class _AppShellState extends State<AppShell> {
                                                 contentRepository:
                                                     widget.contentRepository,
                                                 previewVersion: _previewVersion,
+                                                activityController: _activityController,
+                                                onNavigateToSource: _navigateToSource,
                                                 onClose: () => setState(
                                                     () => _showPreview = false),
                                               ),
