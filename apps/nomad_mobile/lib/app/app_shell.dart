@@ -8,6 +8,10 @@ import '../ui/workspace_view.dart';
 import '../ui/web_preview_view.dart';
 
 const double kTabletBreakpoint = 600.0;
+const double kMinExplorerWidth = 180.0;
+const double kMinEditorWidth = 240.0;
+const double kDefaultExplorerWidth = 280.0;
+const double kMaxExplorerFraction = 0.50;
 
 class AppShell extends StatefulWidget {
   final ProjectRepository repository;
@@ -32,6 +36,7 @@ class _AppShellState extends State<AppShell> {
   FileNode? _activeFileNode;
   bool _showPreview = false;
   int _previewVersion = 0;
+  double _explorerWidth = kDefaultExplorerWidth;
 
   void _onFileSelected(FileNode node) {
     setState(() {
@@ -76,6 +81,17 @@ class _AppShellState extends State<AppShell> {
         _previewVersion++;
       });
     }
+  }
+
+  void _onResizeDividerDrag(
+      DragUpdateDetails details, double maxAvailableWidth) {
+    final maxAllowedWidth = (maxAvailableWidth * kMaxExplorerFraction)
+        .clamp(kMinExplorerWidth, maxAvailableWidth - kMinEditorWidth);
+
+    setState(() {
+      _explorerWidth = (_explorerWidth + details.delta.dx)
+          .clamp(kMinExplorerWidth, maxAllowedWidth);
+    });
   }
 
   @override
@@ -161,7 +177,12 @@ class _AppShellState extends State<AppShell> {
                   ? Row(
                       children: [
                         SizedBox(
-                          width: 300,
+                          width: _explorerWidth.clamp(
+                            kMinExplorerWidth,
+                            (constraints.maxWidth * kMaxExplorerFraction).clamp(
+                                kMinExplorerWidth,
+                                constraints.maxWidth - kMinEditorWidth),
+                          ),
                           child: WorkspaceView(
                             project: _selectedProject!,
                             workspaceRepository: widget.workspaceRepository,
@@ -170,7 +191,11 @@ class _AppShellState extends State<AppShell> {
                             onBack: _onProjectDeselected,
                           ),
                         ),
-                        const VerticalDivider(thickness: 1, width: 1),
+                        _ResizableDivider(
+                          key: const Key('workspace_resizable_divider'),
+                          onDragUpdate: (details) => _onResizeDividerDrag(
+                              details, constraints.maxWidth),
+                        ),
                         Expanded(
                           child: Column(
                             children: [
@@ -382,6 +407,48 @@ class _AppShellState extends State<AppShell> {
                 ),
         );
       },
+    );
+  }
+}
+
+/// A touch-friendly vertical resize divider with a visible handle.
+class _ResizableDivider extends StatelessWidget {
+  final ValueChanged<DragUpdateDetails> onDragUpdate;
+
+  const _ResizableDivider({
+    super.key,
+    required this.onDragUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: onDragUpdate,
+        child: SizedBox(
+          width: 16.0,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              VerticalDivider(
+                thickness: 1.0,
+                width: 1.0,
+                color: Theme.of(context).dividerColor.withAlpha(120),
+              ),
+              Container(
+                width: 4.0,
+                height: 32.0,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2.0),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
