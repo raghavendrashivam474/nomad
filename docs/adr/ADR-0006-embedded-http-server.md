@@ -231,4 +231,30 @@ The existing `FileContentRepository.readFile()` returns `Future<String>`, and `L
 | Physical device validation | Not performed (MF-3) |
 | Emulator validation | Not performed (automated tests only) |
 
-```
+---
+
+## Amendment: MF-2 Preview Integration (2025-07-13)
+
+### Context & Problem
+MF-1 established the standalone `ProjectFileServer` and `ProjectFileResolver`. MF-2 integrated this server with the Flutter `WebPreviewView` UI surface, replacing static inlined HTML assembly with live loopback HTTP preview.
+
+### Decisions Made During Integration
+
+1. **Ownership Model:**
+   - Server lifecycle is strictly bound to `WebPreviewViewState`.
+   - The server starts asynchronously upon preview initialization and project switching.
+   - The server stops and closes its listening socket when the preview widget is disposed.
+   - No global singleton or background service registry was introduced, preserving simplicity and isolating failure domains.
+
+2. **Lifecycle State Synchronization:**
+   - In `ProjectFileServer.stop()`, the internal `_server` and `_subscription` references are captured in local variables and set to `null` synchronously before awaiting `close()` and `cancel()`.
+   - This ensures `isRunning` immediately returns `false` synchronously when stop is requested (e.g. during synchronous widget `dispose()`), avoiding race conditions with subsequent restarts or assertions.
+
+3. **Origin & Storage Boundary:**
+   - Previews now originate from `http://127.0.0.1:<port>/<projectId>/index.html`.
+   - Any prior browser storage (`localStorage`, `IndexedDB`) stored under the legacy `https://localhost/` static preview origin will not migrate automatically. Because current templates do not depend on persistent origin-scoped storage, no migration bridge was introduced.
+
+4. **Testing Strategy:**
+   - `WebPreviewView` accepts an optional `serverPort` parameter (default `18080`).
+   - In automated widget test suites, `serverPort: 0` is passed to allow OS-assigned ephemeral ports, eliminating port collisions in concurrent test runners.
+   - `WebPreviewViewState` was made public with read-only getters for `controller` and `server` to allow deterministic integration testing.
