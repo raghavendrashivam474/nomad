@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/data/templates/web_template.dart';
@@ -73,6 +74,19 @@ class InMemoryWorkspaceRepository implements WorkspaceRepository {
 }
 
 class InMemoryFileContentRepository implements FileContentRepository {
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    final text = await readFile(projectId, fileNodeId);
+    return utf8.encode(text);
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    await writeFile(projectId, fileNodeId, utf8.decode(bytes));
+  }
+
   final Map<String, String> _contents = {};
 
   String _key(EntityId projectId, EntityId fileNodeId) =>

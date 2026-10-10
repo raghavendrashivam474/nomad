@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -32,6 +33,19 @@ class _FakeWorkspaceRepo implements WorkspaceRepository {
 }
 
 class _FakeContentRepo implements FileContentRepository {
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    final text = await readFile(projectId, fileNodeId);
+    return utf8.encode(text);
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    await writeFile(projectId, fileNodeId, utf8.decode(bytes));
+  }
+
   @override
   Future<String> readFile(EntityId projectId, EntityId fileNodeId) async => '';
 
