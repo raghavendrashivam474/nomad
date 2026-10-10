@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:nomad_core/nomad_core.dart';
 
 /// Represents the outcome of a project file path resolution attempt.
@@ -41,10 +41,11 @@ class ProjectFileResolver {
   });
 
   /// Resolves the requested [logicalPath] (e.g., 'css/app.css') within the workspace of [projectId].
-  /// 
+  ///
   /// Path segment validations are strictly enforced to prevent directory traversal
   /// and access violations.
-  Future<FileResolutionResult> resolve(EntityId projectId, String logicalPath) async {
+  Future<FileResolutionResult> resolve(
+      EntityId projectId, String logicalPath) async {
     // 1. Path sanity checks & normalization
     final trimmedPath = logicalPath.trim();
     if (trimmedPath.isEmpty) {
@@ -139,7 +140,8 @@ class ProjectFileResolver {
       // 4. Retrieve content safely
       // Read using existing repository contract (returns String).
       // UTF-8 encodes the returned string to obtain byte representation.
-      final textContent = await contentRepository.readFile(projectId, currentNode.id);
+      final textContent =
+          await contentRepository.readFile(projectId, currentNode.id);
       final bytes = utf8.encode(textContent);
 
       return FileResolutionSuccess(currentNode, bytes);
@@ -151,7 +153,8 @@ class ProjectFileResolver {
     }
   }
 
-  FileNode? _findChildByName(List<FileNode> nodes, EntityId? parentId, String name) {
+  FileNode? _findChildByName(
+      List<FileNode> nodes, EntityId? parentId, String name) {
     for (final node in nodes) {
       if (node.name == name && node.parentId == parentId) {
         return node;

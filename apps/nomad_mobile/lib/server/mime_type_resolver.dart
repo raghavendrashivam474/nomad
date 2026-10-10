@@ -1,4 +1,4 @@
-﻿/// Maps supported file extensions to MIME types.
+/// Maps supported file extensions to MIME types.
 class MimeTypeResolver {
   static const Map<String, String> _map = {
     'html': 'text/html; charset=utf-8',
@@ -18,7 +18,7 @@ class MimeTypeResolver {
   };
 
   /// Resolves the MIME type for a given filename or path.
-  /// 
+  ///
   /// Handles extensions in a case-insensitive manner and returns
   /// a deterministic fallback 'application/octet-stream' for unknown extensions.
   static String resolve(String path) {

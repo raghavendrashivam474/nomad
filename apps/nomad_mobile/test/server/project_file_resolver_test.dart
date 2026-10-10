@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/server/project_file_resolver.dart';
@@ -13,21 +13,24 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
   }
 
   @override
-  Future<FileNode?> getNodeById(EntityId id) async => throw UnimplementedError();
+  Future<FileNode?> getNodeById(EntityId id) async =>
+      throw UnimplementedError();
   @override
   Future<void> createNode(FileNode node) async => throw UnimplementedError();
   @override
-  Future<void> renameNode(EntityId id, String newName) async => throw UnimplementedError();
+  Future<void> renameNode(EntityId id, String newName) async =>
+      throw UnimplementedError();
   @override
   Future<void> deleteNode(EntityId id) async => throw UnimplementedError();
   @override
-  Future<void> deleteAllNodesForProject(EntityId projectId) async => throw UnimplementedError();
+  Future<void> deleteAllNodesForProject(EntityId projectId) async =>
+      throw UnimplementedError();
 }
 
 class FakeFileContentRepository implements FileContentRepository {
   final Map<String, String> contents = {};
 
-  String _key(EntityId projectId, EntityId fileNodeId) => 
+  String _key(EntityId projectId, EntityId fileNodeId) =>
       '${projectId.value}_${fileNodeId.value}';
 
   @override
@@ -36,14 +39,17 @@ class FakeFileContentRepository implements FileContentRepository {
   }
 
   @override
-  Future<void> writeFile(EntityId projectId, EntityId fileNodeId, String content) async {
+  Future<void> writeFile(
+      EntityId projectId, EntityId fileNodeId, String content) async {
     contents[_key(projectId, fileNodeId)] = content;
   }
 
   @override
-  Future<void> deleteContent(EntityId projectId, EntityId fileNodeId) async => throw UnimplementedError();
+  Future<void> deleteContent(EntityId projectId, EntityId fileNodeId) async =>
+      throw UnimplementedError();
   @override
-  Future<void> deleteAllContentForProject(EntityId projectId) async => throw UnimplementedError();
+  Future<void> deleteAllContentForProject(EntityId projectId) async =>
+      throw UnimplementedError();
 }
 
 void main() {
@@ -85,7 +91,8 @@ void main() {
     test('rejects empty or whitespace paths', () async {
       final res1 = await resolver.resolve(projectA, '');
       expect(res1, isA<FileResolutionFailure>());
-      expect((res1 as FileResolutionFailure).errorType, equals(FileResolutionErrorType.invalidPath));
+      expect((res1 as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.invalidPath));
 
       final res2 = await resolver.resolve(projectA, '   ');
       expect(res2, isA<FileResolutionFailure>());
@@ -94,11 +101,13 @@ void main() {
     test('rejects absolute paths and backslashes', () async {
       final res1 = await resolver.resolve(projectA, '/index.html');
       expect(res1, isA<FileResolutionFailure>());
-      expect((res1 as FileResolutionFailure).errorType, equals(FileResolutionErrorType.invalidPath));
+      expect((res1 as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.invalidPath));
 
       final res2 = await resolver.resolve(projectA, 'css\\style.css');
       expect(res2, isA<FileResolutionFailure>());
-      expect((res2 as FileResolutionFailure).errorType, equals(FileResolutionErrorType.invalidPath));
+      expect((res2 as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.invalidPath));
     });
 
     test('rejects path traversal and dots', () async {
@@ -112,20 +121,26 @@ void main() {
       for (final p in traversals) {
         final res = await resolver.resolve(projectA, p);
         expect(res, isA<FileResolutionFailure>(), reason: 'Should reject: $p');
-        expect((res as FileResolutionFailure).errorType, equals(FileResolutionErrorType.pathTraversal));
+        expect((res as FileResolutionFailure).errorType,
+            equals(FileResolutionErrorType.pathTraversal));
       }
     });
 
     test('rejects empty segments', () async {
       final res = await resolver.resolve(projectA, 'css//style.css');
       expect(res, isA<FileResolutionFailure>());
-      expect((res as FileResolutionFailure).errorType, equals(FileResolutionErrorType.invalidPath));
+      expect((res as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.invalidPath));
     });
   });
 
   group('ProjectFileResolver Resolution Tests', () {
     test('resolves root level file successfully', () async {
-      final node = makeNode(id: 'f1', projectId: projectA, name: 'index.html', type: FileNodeType.file);
+      final node = makeNode(
+          id: 'f1',
+          projectId: projectA,
+          name: 'index.html',
+          type: FileNodeType.file);
       workspaceRepo.nodes.add(node);
       await contentRepo.writeFile(projectA, node.id, '<h1>Hello World</h1>');
 
@@ -137,10 +152,20 @@ void main() {
     });
 
     test('resolves nested folder file successfully', () async {
-      final cssFolder = makeNode(id: 'dir1', projectId: projectA, name: 'css', type: FileNodeType.folder);
-      final styleCss = makeNode(id: 'f2', projectId: projectA, parentId: 'dir1', name: 'style.css', type: FileNodeType.file);
+      final cssFolder = makeNode(
+          id: 'dir1',
+          projectId: projectA,
+          name: 'css',
+          type: FileNodeType.folder);
+      final styleCss = makeNode(
+          id: 'f2',
+          projectId: projectA,
+          parentId: 'dir1',
+          name: 'style.css',
+          type: FileNodeType.file);
       workspaceRepo.nodes.addAll([cssFolder, styleCss]);
-      await contentRepo.writeFile(projectA, styleCss.id, 'body { color: red; }');
+      await contentRepo.writeFile(
+          projectA, styleCss.id, 'body { color: red; }');
 
       final res = await resolver.resolve(projectA, 'css/style.css');
       expect(res, isA<FileResolutionSuccess>());
@@ -150,33 +175,53 @@ void main() {
     });
 
     test('returns targetIsDirectory when path points to a folder', () async {
-      final cssFolder = makeNode(id: 'dir1', projectId: projectA, name: 'css', type: FileNodeType.folder);
+      final cssFolder = makeNode(
+          id: 'dir1',
+          projectId: projectA,
+          name: 'css',
+          type: FileNodeType.folder);
       workspaceRepo.nodes.add(cssFolder);
 
       final res = await resolver.resolve(projectA, 'css');
       expect(res, isA<FileResolutionFailure>());
-      expect((res as FileResolutionFailure).errorType, equals(FileResolutionErrorType.targetIsDirectory));
+      expect((res as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.targetIsDirectory));
     });
 
     test('returns notFound when segment does not exist', () async {
       final res = await resolver.resolve(projectA, 'nonexistent.html');
       expect(res, isA<FileResolutionFailure>());
-      expect((res as FileResolutionFailure).errorType, equals(FileResolutionErrorType.notFound));
+      expect((res as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.notFound));
     });
 
-    test('returns notFound when trying to use file as parent directory', () async {
-      final indexHtml = makeNode(id: 'f1', projectId: projectA, name: 'index.html', type: FileNodeType.file);
+    test('returns notFound when trying to use file as parent directory',
+        () async {
+      final indexHtml = makeNode(
+          id: 'f1',
+          projectId: projectA,
+          name: 'index.html',
+          type: FileNodeType.file);
       workspaceRepo.nodes.add(indexHtml);
 
       final res = await resolver.resolve(projectA, 'index.html/sub.css');
       expect(res, isA<FileResolutionFailure>());
-      expect((res as FileResolutionFailure).errorType, equals(FileResolutionErrorType.notFound));
+      expect((res as FileResolutionFailure).errorType,
+          equals(FileResolutionErrorType.notFound));
     });
 
     test('enforces strict project boundary isolation', () async {
       // Create identical file names in Project A and Project B
-      final nodeA = makeNode(id: 'f-a', projectId: projectA, name: 'style.css', type: FileNodeType.file);
-      final nodeB = makeNode(id: 'f-b', projectId: projectB, name: 'style.css', type: FileNodeType.file);
+      final nodeA = makeNode(
+          id: 'f-a',
+          projectId: projectA,
+          name: 'style.css',
+          type: FileNodeType.file);
+      final nodeB = makeNode(
+          id: 'f-b',
+          projectId: projectB,
+          name: 'style.css',
+          type: FileNodeType.file);
       workspaceRepo.nodes.addAll([nodeA, nodeB]);
 
       await contentRepo.writeFile(projectA, nodeA.id, 'A_CSS');
@@ -185,12 +230,14 @@ void main() {
       // Querying with projectA must only return Project A content
       final resA = await resolver.resolve(projectA, 'style.css');
       expect(resA, isA<FileResolutionSuccess>());
-      expect(utf8.decode((resA as FileResolutionSuccess).bytes), equals('A_CSS'));
+      expect(
+          utf8.decode((resA as FileResolutionSuccess).bytes), equals('A_CSS'));
 
       // Querying with projectB must only return Project B content
       final resB = await resolver.resolve(projectB, 'style.css');
       expect(resB, isA<FileResolutionSuccess>());
-      expect(utf8.decode((resB as FileResolutionSuccess).bytes), equals('B_CSS'));
+      expect(
+          utf8.decode((resB as FileResolutionSuccess).bytes), equals('B_CSS'));
     });
   });
 }
