@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -7,6 +7,8 @@ import 'package:nomad_mobile/ui/editor_view.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
   final List<FileNode> nodes;
   FakeWorkspaceRepository(this.nodes);
 
@@ -57,7 +59,7 @@ class FakeFileContentRepository implements FileContentRepository {
   Future<void> deleteAllContentForProject(EntityId projectId) async {}
 }
 
-// ── Complete Headless Test Stub for WebViewPlatform ─────────────────
+// â”€â”€ Complete Headless Test Stub for WebViewPlatform â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestWebViewPlatform extends WebViewPlatform {
   @override
   PlatformWebViewController createPlatformWebViewController(

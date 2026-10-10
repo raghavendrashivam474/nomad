@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -27,6 +27,8 @@ class InMemoryProjectRepository implements ProjectRepository {
 }
 
 class InMemoryWorkspaceRepository implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
   final Map<String, List<FileNode>> _nodes = {};
 
   @override

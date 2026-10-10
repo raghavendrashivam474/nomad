@@ -6,6 +6,9 @@ import 'package:nomad_mobile/server/project_file_resolver.dart';
 import 'package:nomad_mobile/server/project_file_server.dart';
 
 class InMemoryWorkspaceRepository implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async =>
+      throw UnimplementedError();
   final List<FileNode> nodes = [];
 
   @override

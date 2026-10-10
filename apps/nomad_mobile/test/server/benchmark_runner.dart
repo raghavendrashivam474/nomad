@@ -1,4 +1,4 @@
-﻿// ignore_for_file: avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings
+// ignore_for_file: avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings
 
 import 'dart:convert';
 import 'dart:io';
@@ -7,6 +7,8 @@ import 'package:nomad_mobile/server/project_file_resolver.dart';
 import 'package:nomad_mobile/server/project_file_server.dart';
 
 class BenchmarkWorkspaceRepo implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
   final List<FileNode> nodes = [];
 
   @override
@@ -354,4 +356,3 @@ void main() async {
   await server.stop();
   client.close(force: true);
 }
-

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -18,6 +18,8 @@ class _FakeProjectRepo implements ProjectRepository {
 }
 
 class _FakeWorkspaceRepo implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
   @override
   Future<List<FileNode>> getNodesForProject(EntityId projectId) async => [];
   @override

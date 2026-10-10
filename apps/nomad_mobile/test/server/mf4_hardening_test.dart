@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -6,6 +6,8 @@ import 'package:nomad_mobile/server/project_file_resolver.dart';
 import 'package:nomad_mobile/server/project_file_server.dart';
 
 class _InMemWorkspace implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
   final List<FileNode> nodes = [];
   @override
   Future<List<FileNode>> getNodesForProject(EntityId projectId) async =>

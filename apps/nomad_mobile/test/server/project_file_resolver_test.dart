@@ -4,6 +4,9 @@ import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/server/project_file_resolver.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async =>
+      throw UnimplementedError();
   final List<FileNode> nodes = [];
 
   @override
