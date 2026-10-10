@@ -9,6 +9,7 @@ class ContextualCodePanel extends StatelessWidget {
   final FocusNode focusNode;
   final SourceLanguage language;
   final VoidCallback onClose;
+  final double maxHeight;
 
   const ContextualCodePanel({
     super.key,
@@ -16,6 +17,7 @@ class ContextualCodePanel extends StatelessWidget {
     required this.focusNode,
     required this.language,
     required this.onClose,
+    this.maxHeight = 220,
   });
 
   void _keepFocus(void Function() action) {
@@ -35,7 +37,7 @@ class ContextualCodePanel extends StatelessWidget {
         isDark ? const Color(0xFF383838) : const Color(0xFFD4D4D4);
 
     return Container(
-      constraints: const BoxConstraints(maxHeight: 220),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: panelBg,
         border: Border(

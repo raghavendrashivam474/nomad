@@ -288,52 +288,71 @@ class _EditorViewState extends State<EditorView> {
                         ),
                       ),
                     )
-                  : Column(
-                      children: [
-                        // Main text editing field
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: TextField(
-                              key: const Key('editor_text_field'),
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              maxLines: null,
-                              expands: true,
-                              keyboardType: TextInputType.multiline,
-                              autofocus: true,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 14.0,
-                                height: 1.4,
-                              ),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                hintText: 'Type your code here...',
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final availableHeight = constraints.maxHeight;
+
+                        // ── Adaptive Layout Calculations ──
+                        // If vertical space is extremely short (e.g., keyboard open on phone landscape),
+                        // temporarily hide the contextual panel so the text editor has enough room to be usable.
+                        final shouldShowPanel =
+                            _isPanelExpanded && availableHeight >= 180.0;
+
+                        // Dynamically scale panel height to at most 45% of available space, clamped safely between 80px and 220px.
+                        final dynamicMaxHeight =
+                            (availableHeight * 0.45).clamp(80.0, 220.0);
+
+                        return Column(
+                          children: [
+                            // Main text editing field
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: TextField(
+                                  key: const Key('editor_text_field'),
+                                  controller: _controller,
+                                  focusNode: _focusNode,
+                                  maxLines: null,
+                                  expands: true,
+                                  keyboardType: TextInputType.multiline,
+                                  autofocus: true,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 14.0,
+                                    height: 1.4,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'Type your code here...',
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
 
-                        // Expandable Contextual Panel
-                        if (_isPanelExpanded)
-                          ContextualCodePanel(
-                            controller: _controller,
-                            focusNode: _focusNode,
-                            language: _language,
-                            onClose: () =>
-                                setState(() => _isPanelExpanded = false),
-                          ),
+                            // Expandable Contextual Panel
+                            if (shouldShowPanel)
+                              Flexible(
+                                child: ContextualCodePanel(
+                                  controller: _controller,
+                                  focusNode: _focusNode,
+                                  language: _language,
+                                  maxHeight: dynamicMaxHeight,
+                                  onClose: () =>
+                                      setState(() => _isPanelExpanded = false),
+                                ),
+                              ),
 
-                        // Compact Coding Accessory Bar
-                        CodeAccessoryBar(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          language: _language,
-                          isPanelExpanded: _isPanelExpanded,
-                          onTogglePanel: _togglePanel,
-                        ),
-                      ],
+                            // Compact Coding Accessory Bar
+                            CodeAccessoryBar(
+                              controller: _controller,
+                              focusNode: _focusNode,
+                              language: _language,
+                              isPanelExpanded: _isPanelExpanded,
+                              onTogglePanel: _togglePanel,
+                            ),
+                          ],
+                        );
+                      },
                     ),
         ),
       ),
