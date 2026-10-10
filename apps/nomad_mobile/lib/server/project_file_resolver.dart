@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:nomad_core/nomad_core.dart';
 
 /// Represents the outcome of a project file path resolution attempt.
@@ -137,12 +136,10 @@ class ProjectFileResolver {
         );
       }
 
-      // 4. Retrieve content safely
-      // Read using existing repository contract (returns String).
-      // UTF-8 encodes the returned string to obtain byte representation.
-      final textContent =
-          await contentRepository.readFile(projectId, currentNode.id);
-      final bytes = utf8.encode(textContent);
+      // 4. Retrieve content safely as raw bytes.
+      // Uses the byte-safe repository path to preserve binary assets.
+      final bytes =
+          await contentRepository.readFileBytes(projectId, currentNode.id);
 
       return FileResolutionSuccess(currentNode, bytes);
     } catch (e) {
