@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'mime_type_resolver.dart';
@@ -37,14 +37,16 @@ class ProjectFileServer {
       shared: false,
     );
 
-    _server = server;
-    _subscription = server.listen(
+    final subscription = server.listen(
       _handleRequest,
       onError: (error, stackTrace) {
-        // Log or handle server stream errors without crashing
+        // Handle stream-level errors gracefully without terminating
       },
       cancelOnError: false,
     );
+
+    _server = server;
+    _subscription = subscription;
   }
 
   /// Stops the server and releases the bound socket.
@@ -101,6 +103,8 @@ class ProjectFileServer {
         final mimeTypeStr = MimeTypeResolver.resolve(result.node.name);
         response.statusCode = HttpStatus.ok;
         response.headers.set(HttpHeaders.contentTypeHeader, mimeTypeStr);
+        response.headers.set(
+            HttpHeaders.contentLengthHeader, result.bytes.length);
         response.headers.set(HttpHeaders.cacheControlHeader,
             'no-cache, no-store, must-revalidate');
 
