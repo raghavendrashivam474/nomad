@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nomad_core/nomad_core.dart';
@@ -188,8 +188,8 @@ void main() {
 
       await server.stop(force: true);
 
-      final results = await Future.wait(futures)
-          .timeout(const Duration(seconds: 5));
+      final results =
+          await Future.wait(futures).timeout(const Duration(seconds: 5));
 
       expect(server.isRunning, isFalse);
       for (final r in results) {

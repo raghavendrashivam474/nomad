@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'mime_type_resolver.dart';
@@ -103,8 +103,8 @@ class ProjectFileServer {
         final mimeTypeStr = MimeTypeResolver.resolve(result.node.name);
         response.statusCode = HttpStatus.ok;
         response.headers.set(HttpHeaders.contentTypeHeader, mimeTypeStr);
-        response.headers.set(
-            HttpHeaders.contentLengthHeader, result.bytes.length);
+        response.headers
+            .set(HttpHeaders.contentLengthHeader, result.bytes.length);
         response.headers.set(HttpHeaders.cacheControlHeader,
             'no-cache, no-store, must-revalidate');
 

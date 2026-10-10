@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/server/project_file_resolver.dart';
@@ -101,8 +101,8 @@ void main() async {
     updatedAt: DateTime.now(),
   );
   ws.nodes.add(htmlNode);
-  await ct.writeFile(
-      proj, htmlNode.id, '<!DOCTYPE html><html><body><h1>Benchmark</h1></body></html>');
+  await ct.writeFile(proj, htmlNode.id,
+      '<!DOCTYPE html><html><body><h1>Benchmark</h1></body></html>');
 
   // 2. CSS (~5KB)
   final cssNode = FileNode(
@@ -114,7 +114,8 @@ void main() async {
     updatedAt: DateTime.now(),
   );
   ws.nodes.add(cssNode);
-  await ct.writeFile(proj, cssNode.id, '/* CSS payload */\n' + 'body { margin: 0; padding: 0; }\n' * 150);
+  await ct.writeFile(proj, cssNode.id,
+      '/* CSS payload */\n' + 'body { margin: 0; padding: 0; }\n' * 150);
 
   // 3. JavaScript module (~20KB)
   final jsNode = FileNode(
@@ -126,7 +127,11 @@ void main() async {
     updatedAt: DateTime.now(),
   );
   ws.nodes.add(jsNode);
-  await ct.writeFile(proj, jsNode.id, '// JS bundle\n' + 'export function run() { console.log("bench"); }\n' * 400);
+  await ct.writeFile(
+      proj,
+      jsNode.id,
+      '// JS bundle\n' +
+          'export function run() { console.log("bench"); }\n' * 400);
 
   // 4. Nested resource (assets/icons/logo.svg) (~10KB)
   final dirAssets = FileNode(
@@ -156,7 +161,12 @@ void main() async {
     updatedAt: DateTime.now(),
   );
   ws.nodes.addAll([dirAssets, dirIcons, svgNode]);
-  await ct.writeFile(proj, svgNode.id, '<svg viewBox="0 0 100 100">\n' + '<circle cx="50" cy="50" r="40" />\n' * 200 + '</svg>');
+  await ct.writeFile(
+      proj,
+      svgNode.id,
+      '<svg viewBox="0 0 100 100">\n' +
+          '<circle cx="50" cy="50" r="40" />\n' * 200 +
+          '</svg>');
 
   // 5. Binary PNG (~64KB)
   final pngNode = FileNode(
@@ -181,7 +191,8 @@ void main() async {
     updatedAt: DateTime.now(),
   );
   ws.nodes.add(largeHtmlNode);
-  await ct.writeFile(proj, largeHtmlNode.id, '<div>' * 10000 + 'Large Webpack Bundle Simulator' + '</div>' * 10000);
+  await ct.writeFile(proj, largeHtmlNode.id,
+      '<div>' * 10000 + 'Large Webpack Bundle Simulator' + '</div>' * 10000);
 
   final largeImgNode = FileNode(
     id: const EntityId('node_lg_img'),
@@ -278,23 +289,49 @@ void main() async {
   }
 
   // --- Workloads ---
-  await runScenario(name: '1. Small HTML (~1KB)', path: 'index.html', iterations: 200);
-  await runScenario(name: '2. CSS Stylesheet (~5KB)', path: 'style.css', iterations: 200);
-  await runScenario(name: '3. JavaScript Bundle (~20KB)', path: 'app.js', iterations: 200);
-  await runScenario(name: '4. Nested SVG Resource (~10KB)', path: 'assets/icons/logo.svg', iterations: 200);
-  await runScenario(name: '5. Binary PNG Asset (~64KB)', path: 'image.png', iterations: 200);
+  await runScenario(
+      name: '1. Small HTML (~1KB)', path: 'index.html', iterations: 200);
+  await runScenario(
+      name: '2. CSS Stylesheet (~5KB)', path: 'style.css', iterations: 200);
+  await runScenario(
+      name: '3. JavaScript Bundle (~20KB)', path: 'app.js', iterations: 200);
+  await runScenario(
+      name: '4. Nested SVG Resource (~10KB)',
+      path: 'assets/icons/logo.svg',
+      iterations: 200);
+  await runScenario(
+      name: '5. Binary PNG Asset (~64KB)', path: 'image.png', iterations: 200);
 
   // Concurrency workloads
-  await runScenario(name: '6a. Concurrent CSS (C=5)', path: 'style.css', iterations: 200, concurrency: 5);
-  await runScenario(name: '6b. Concurrent JS (C=10)', path: 'app.js', iterations: 200, concurrency: 10);
-  await runScenario(name: '6c. Concurrent Binary (C=10)', path: 'image.png', iterations: 200, concurrency: 10);
+  await runScenario(
+      name: '6a. Concurrent CSS (C=5)',
+      path: 'style.css',
+      iterations: 200,
+      concurrency: 5);
+  await runScenario(
+      name: '6b. Concurrent JS (C=10)',
+      path: 'app.js',
+      iterations: 200,
+      concurrency: 10);
+  await runScenario(
+      name: '6c. Concurrent Binary (C=10)',
+      path: 'image.png',
+      iterations: 200,
+      concurrency: 10);
 
   // Large file workloads
-  await runScenario(name: '7a. Large HTML Bundle (~500KB)', path: 'bundle.html', iterations: 50);
-  await runScenario(name: '7b. Large Image Asset (~2MB)', path: 'large_photo.jpg', iterations: 50);
+  await runScenario(
+      name: '7a. Large HTML Bundle (~500KB)',
+      path: 'bundle.html',
+      iterations: 50);
+  await runScenario(
+      name: '7b. Large Image Asset (~2MB)',
+      path: 'large_photo.jpg',
+      iterations: 50);
 
   final midRss = ProcessInfo.currentRss / (1024 * 1024);
-  print('Process RSS Memory after request workloads: ${midRss.toStringAsFixed(2)} MB (Delta: +${(midRss - initialRss).toStringAsFixed(2)} MB)\n');
+  print(
+      'Process RSS Memory after request workloads: ${midRss.toStringAsFixed(2)} MB (Delta: +${(midRss - initialRss).toStringAsFixed(2)} MB)\n');
 
   // Lifecycle stress benchmark
   print('[8. Lifecycle Stress: 50 Repeated Start/Stop Cycles]');
@@ -304,10 +341,12 @@ void main() async {
     await server.start();
   }
   swLife.stop();
-  print('  Completed 50 start/stop cycles in ${swLife.elapsedMilliseconds}ms (${(swLife.elapsedMilliseconds / 50).toStringAsFixed(2)}ms / cycle)\n');
+  print(
+      '  Completed 50 start/stop cycles in ${swLife.elapsedMilliseconds}ms (${(swLife.elapsedMilliseconds / 50).toStringAsFixed(2)}ms / cycle)\n');
 
   final finalRss = ProcessInfo.currentRss / (1024 * 1024);
-  print('Final Process RSS Memory: ${finalRss.toStringAsFixed(2)} MB (Total Delta: +${(finalRss - initialRss).toStringAsFixed(2)} MB)');
+  print(
+      'Final Process RSS Memory: ${finalRss.toStringAsFixed(2)} MB (Total Delta: +${(finalRss - initialRss).toStringAsFixed(2)} MB)');
   print('================================================================');
 
   await server.stop();
