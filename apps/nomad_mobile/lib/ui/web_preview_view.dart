@@ -1,8 +1,11 @@
-/// Web Lab preview surface for Nomad.
+﻿/// Web Lab preview surface for Nomad.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import 'package:nomad_mobile/activity/activity_controller.dart';
+import 'package:nomad_mobile/activity/activity_event.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../server/project_file_server.dart';
 import '../server/project_file_resolver.dart';
@@ -21,6 +24,7 @@ class WebPreviewView extends StatefulWidget {
   final int serverPort;
 
   const WebPreviewView({
+    this.activityController,
     super.key,
     required this.project,
     required this.workspaceRepository,
@@ -28,7 +32,8 @@ class WebPreviewView extends StatefulWidget {
     required this.previewVersion,
     this.onClose,
     this.serverPort = 18080,
-  });
+  });  /// Optional activity controller for Live Activity event reporting.
+  final ActivityController? activityController;
 
   @override
   State<WebPreviewView> createState() => WebPreviewViewState();
@@ -57,14 +62,36 @@ class WebPreviewViewState extends State<WebPreviewView> {
       ..setBackgroundColor(const Color(0xFF0F172A))
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) {
+          onPageStarted: (url) {
+        widget.activityController?.beginSession();        _reportActivity(
+          category: ActivityCategory.lifecycle,
+          severity: ActivitySeverity.info,
+          message: 'Preview loading...',
+          details: url,
+        );
             if (mounted) setState(() => _isLoading = true);
           },
-          onPageFinished: (_) {
+          onPageFinished: (url) {
+        _reportActivity(
+          category: ActivityCategory.lifecycle,
+          severity: ActivitySeverity.info,
+          message: 'Preview ready',
+          details: url,
+        );
             if (mounted) setState(() => _isLoading = false);
           },
           onWebResourceError: (err) {
             debugPrint('WebView resource error: ${err.description}');
+        _reportActivity(
+          category: ActivityCategory.resource,
+          severity: err.isForMainFrame == true
+              ? ActivitySeverity.error
+              : ActivitySeverity.warning,
+          message: 'Resource error: ${err.description}',
+          details: 'URL: ${err.url ?? "unknown"}, '
+              'type: ${err.errorType}, '
+              'mainFrame: ${err.isForMainFrame}',
+        );
           },
         ),
       );
@@ -75,18 +102,18 @@ class WebPreviewViewState extends State<WebPreviewView> {
   void didUpdateWidget(covariant WebPreviewView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project.id != widget.project.id) {
-      // Project changed — tear down old server, start fresh.
+      // Project changed â€” tear down old server, start fresh.
       _disposeServer();
       _startServerAndLoad();
     } else if (oldWidget.previewVersion != widget.previewVersion) {
-      // Same project, content saved — reload over existing server.
+      // Same project, content saved â€” reload over existing server.
       _refreshPreview();
     }
   }
 
-  // ── Server lifecycle ────────────────────────────────────────────────
+  // â”€â”€ Server lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  /// Full startup sequence: pre-check → start server → load URL.
+  /// Full startup sequence: pre-check â†’ start server â†’ load URL.
   Future<void> _startServerAndLoad() async {
     final token = ++_loadToken;
 
@@ -214,7 +241,25 @@ class WebPreviewViewState extends State<WebPreviewView> {
     super.dispose();
   }
 
-  // ── Build ───────────────────────────────────────────────────────────
+  // â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /// Emit an activity event if the controller is available.
+  /// Silently no-ops when no controller is provided, keeping the
+  /// preview fully functional without Live Activity.
+  void _reportActivity({
+    required ActivityCategory category,
+    required ActivitySeverity severity,
+    required String message,
+    String? details,
+  }) {
+    final controller = widget.activityController;
+    if (controller == null) return;
+    controller.add(controller.createEvent(
+      category: category,
+      severity: severity,
+      message: message,
+      details: details,
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +280,7 @@ class WebPreviewViewState extends State<WebPreviewView> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Preview — ${widget.project.name}',
+                'Preview â€” ${widget.project.name}',
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 16,
