@@ -1,3 +1,5 @@
+﻿// ignore_for_file: avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
@@ -352,3 +354,4 @@ void main() async {
   await server.stop();
   client.close(force: true);
 }
+
