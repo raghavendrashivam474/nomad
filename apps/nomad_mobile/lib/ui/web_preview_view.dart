@@ -1,5 +1,6 @@
-/// Web Lab preview surface for Nomad.
+﻿/// Web Lab preview surface for Nomad.
 library;
+import '../server/nomad_transport_source.dart';
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -79,7 +80,13 @@ class WebPreviewViewState extends State<WebPreviewView> {
             );
             if (mounted) setState(() => _isLoading = true);
           },
-          onPageFinished: (url) {
+                  onPageFinished: (url) {
+          // ADR-0010: Fallback Auto-Injection Guard
+          try { _controller.runJavaScript('''
+            if (typeof window.NomadTransport === 'undefined') {
+              ${NomadTransportSource.jsContent}
+            }
+          ''').catchError((_) {}); } catch (_) {}
             _reportActivity(
               category: ActivityCategory.lifecycle,
               severity: ActivitySeverity.info,
@@ -487,3 +494,4 @@ class WebPreviewViewState extends State<WebPreviewView> {
     );
   }
 }
+

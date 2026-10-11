@@ -1,3 +1,4 @@
+﻿import 'nomad_transport_source.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
@@ -78,7 +79,19 @@ class ProjectFileServer {
         return;
       }
 
-      final uriPath = request.uri.path;
+            final uriPath = request.uri.path;
+
+      // ADR-0010: Virtual System Route Interception (/_nomad/transport.js)
+      if (uriPath.contains('/_nomad/transport.js')) {
+        response.statusCode = HttpStatus.ok;
+        response.headers.set(HttpHeaders.contentTypeHeader, 'application/javascript; charset=utf-8');
+        response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache, no-store, must-revalidate');
+        if (request.method == 'GET') {
+          response.write(NomadTransportSource.jsContent);
+        }
+        await response.close();
+        return;
+      }
       // Expected URL format: /<projectId>/<path/to/file>
       final segments = uriPath.split('/').where((s) => s.isNotEmpty).toList();
 
