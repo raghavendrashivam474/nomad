@@ -97,6 +97,8 @@ body {
 
 .state-idle { background: rgba(139, 148, 158, 0.2); color: var(--text-secondary); }
 .state-connecting { background: rgba(210, 153, 34, 0.2); color: var(--accent-amber); }
+.state-reconnecting { background: rgba(88, 166, 255, 0.2); color: var(--accent-cyan); animation: pulse 1s infinite alternate; }
+.state-connected { background: rgba(46, 160, 67, 0.2); color: var(--accent-green-bright); }
 .state-connected { background: rgba(46, 160, 67, 0.2); color: var(--accent-green-bright); }
 .state-disconnected { background: rgba(139, 148, 158, 0.2); color: var(--text-secondary); }
 .state-failed { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
@@ -416,3 +418,4 @@ textarea:focus, input[type="text"]:focus {
   from { opacity: 0; transform: translate(-50%, 10px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+

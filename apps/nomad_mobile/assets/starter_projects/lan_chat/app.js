@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   localPeerLabel.textContent = transport.localPeerId;
 
   // --- State Machine UI Binding ---
-  transport.on('statechange', (newState) => {
+    transport.on('statechange', (newState) => {
     statusBadge.textContent = newState.toUpperCase();
     statusBadge.className = `status-badge state-${newState}`;
 
@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
       disconnectBtn.classList.remove('hidden');
       messageInput.focus();
       showToast('Connected to peer!');
+    } else if (newState === 'reconnecting') {
+      showToast('Connection interrupted. Attempting recovery...');
+      appendSystemMessage('⚠️ Connection interrupted by OS. Recovering...');
     } else {
       chatPanel.classList.add('hidden');
       connectPanel.classList.remove('hidden');
@@ -61,7 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (newState === 'failed') {
-      showToast('Connection failed. Please retry.');
+      showToast('Connection failed. You can attempt to Reconnect below.');
+      btnCreateOffer.disabled = false;
+      btnCreateOffer.textContent = 'Generate Offer Token';
+      btnJoinOffer.disabled = false;
+      btnJoinOffer.textContent = 'Generate Answer Token';
     }
   });
 
@@ -237,3 +244,4 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(successMsg);
   }
 });
+
