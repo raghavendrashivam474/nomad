@@ -7,6 +7,8 @@ import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
 import '../ui/workspace_view.dart';
 import '../ui/web_preview_view.dart';
+import '../terminal/terminal_controller.dart';
+import '../terminal/terminal_view.dart';
 
 const double kTabletBreakpoint = 600.0;
 const double kMinExplorerWidth = 180.0;
@@ -40,9 +42,20 @@ class _AppShellState extends State<AppShell> {
   double _explorerWidth = kDefaultExplorerWidth;
 
   final ActivityController _activityController = ActivityController();
+  late final TerminalController _terminalController;
+
+  @override
+  void initState() {
+    super.initState();
+    _terminalController = TerminalController(
+      workspaceRepository: widget.workspaceRepository,
+      contentRepository: widget.contentRepository,
+    );
+  }
 
   @override
   void dispose() {
+    _terminalController.dispose();
     _activityController.dispose();
     super.dispose();
   }
@@ -75,6 +88,7 @@ class _AppShellState extends State<AppShell> {
 
   void _onProjectDeselected() {
     _activityController.clear();
+    _terminalController.setActiveProject(null);
     setState(() {
       _selectedProject = null;
       _openTabs.clear();
@@ -116,7 +130,6 @@ class _AppShellState extends State<AppShell> {
       if (targetNode != null) {
         setState(() {
           _onFileSelected(targetNode);
-          // On phone layout, close preview to reveal editor
           _showPreview = false;
         });
       }
@@ -125,13 +138,19 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  void _selectProject(Project project) {
+    setState(() {
+      _selectedProject = project;
+      _terminalController.setActiveProject(project);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth >= kTabletBreakpoint;
 
-        // On phone, if preview is active and a project is open, show the full-screen preview
         if (!isTablet && _selectedProject != null && _showPreview) {
           return WebPreviewView(
             key: ValueKey('preview_${_selectedProject!.id.value}'),
@@ -145,7 +164,6 @@ class _AppShellState extends State<AppShell> {
           );
         }
 
-        // On phone, if an active file is open, show editor full-screen
         if (!isTablet && _activeFileNode != null) {
           return EditorView(
             key: ValueKey(_activeFileNode!.id.value),
@@ -389,37 +407,81 @@ class _AppShellState extends State<AppShell> {
                         ),
                       ],
                     )
-                  : WorkspaceView(
-                      project: _selectedProject!,
-                      workspaceRepository: widget.workspaceRepository,
-                      selectedNodeId: _activeFileNode?.id,
-                      onFileSelected: _onFileSelected,
-                      onBack: _onProjectDeselected,
-                    )
+                  : _selectedIndex == 0
+                      ? TerminalView(controller: _terminalController)
+                      : WorkspaceView(
+                          project: _selectedProject!,
+                          workspaceRepository: widget.workspaceRepository,
+                          selectedNodeId: _activeFileNode?.id,
+                          onFileSelected: _onFileSelected,
+                          onBack: _onProjectDeselected,
+                        )
               : isTablet
                   ? _TabletLayout(
                       selectedIndex: _selectedIndex,
+                      terminalController: _terminalController,
                       onDestinationSelected: (idx) =>
                           setState(() => _selectedIndex = idx),
                       repository: widget.repository,
                       workspaceRepository: widget.workspaceRepository,
                       contentRepository: widget.contentRepository,
-                      onProjectSelected: (project) =>
-                          setState(() => _selectedProject = project),
+                      onProjectSelected: _selectProject,
                     )
                   : _selectedIndex == 0
-                      ? _PhoneHomeLayout(
-                          onOpenProjects: () =>
-                              setState(() => _selectedIndex = 1),
+                      ? Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(NomadBrand.space16),
+                              child: Column(
+                                children: [
+                                  const NomadLogo(size: 48, showBorder: true),
+                                  const SizedBox(height: NomadBrand.space8),
+                                  Text(
+                                    NomadBrand.productName,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    NomadBrand.subTagline,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: NomadBrand.space12),
+                                  FilledButton.icon(
+                                    key: const Key('get_started_button'),
+                                    onPressed: () =>
+                                        setState(() => _selectedIndex = 1),
+                                    icon: const Icon(Icons.play_arrow_rounded),
+                                    label: const Text('Get Started'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                              child: TerminalView(
+                                  controller: _terminalController),
+                            ),
+                          ],
                         )
                       : ProjectsView(
                           repository: widget.repository,
                           workspaceRepository: widget.workspaceRepository,
                           contentRepository: widget.contentRepository,
-                          onProjectSelected: (project) =>
-                              setState(() => _selectedProject = project),
+                          onProjectSelected: _selectProject,
                         ),
-          bottomNavigationBar: (isTablet || _selectedProject != null)
+          bottomNavigationBar: isTablet
               ? null
               : NavigationBar(
                   selectedIndex: _selectedIndex,
@@ -446,7 +508,6 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-/// A touch-friendly vertical resize divider with a visible handle.
 class _ResizableDivider extends StatelessWidget {
   final ValueChanged<DragUpdateDetails> onDragUpdate;
 
@@ -536,6 +597,7 @@ class _PhoneHomeLayout extends StatelessWidget {
 }
 
 class _TabletLayout extends StatelessWidget {
+  final TerminalController terminalController;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final ProjectRepository repository;
@@ -544,6 +606,7 @@ class _TabletLayout extends StatelessWidget {
   final ValueChanged<Project> onProjectSelected;
 
   const _TabletLayout({
+    required this.terminalController,
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.repository,
@@ -581,47 +644,48 @@ class _TabletLayout extends StatelessWidget {
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
             child: selectedIndex == 0
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(NomadBrand.space32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const NomadLogo(size: 112, showBorder: true),
-                          const SizedBox(height: NomadBrand.space24),
-                          Text(
-                            '${NomadBrand.productName} — ${NomadBrand.tagline}',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: NomadBrand.space12),
-                          Text(
-                            'Responsive Tablet Foundation Active',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                          const SizedBox(height: NomadBrand.space32),
-                          FilledButton.icon(
-                            onPressed: () => onDestinationSelected(1),
-                            icon: const Icon(Icons.explore_rounded),
-                            label: const Text('Explore Workspace'),
-                          ),
-                        ],
+                ? Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(NomadBrand.space24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const NomadLogo(size: 80, showBorder: true),
+                            const SizedBox(height: NomadBrand.space16),
+                            Text(
+                              '${NomadBrand.productName} — ${NomadBrand.tagline}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: NomadBrand.space12),
+                            Text(
+                              'Responsive Tablet Foundation Active',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: TerminalView(
+                            controller: terminalController),
+                      ),
+                    ],
                   )
                 : ProjectsView(
                     repository: repository,
