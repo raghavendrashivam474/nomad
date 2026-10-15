@@ -1,0 +1,78 @@
+---
+
+# Sprint S-T1 Post-Mortem & Completion Report
+**Project:** Nomad — Mobile-First Development Lab
+**Phase:** NT-1 (Nomad Terminal: Project Shell)
+**Status:** ✅ Successfully Delivered and Verified on Android Hardware
+
+## 1. Executive Summary
+Sprint S-T1 successfully integrated the V1 Nomad Terminal into the existing Flutter application. We adhered strictly to the S-T0 constraints: zero new dependencies, reuse of existing repository contracts (`WorkspaceRepository`, `FileContentRepository`), and preservation of existing architectural boundaries. 
+
+The terminal is fully functional on-device, successfully bound to the active project, and protects the virtual filesystem via bounded outputs, tree traversal limits, and binary-file detection.
+
+---
+
+## 2. What Was Implemented & How
+
+### Architecture
+We implemented a strict unidirectional flow separated into three new files, injecting them into the existing `AppShell`:
+1.  **`TerminalView` (UI):** A mobile-friendly widget handling the keyboard, output rendering, scroll-to-bottom physics, and theme switching. It contains *zero* filesystem logic.
+2.  **`TerminalController` (State):** A `ChangeNotifier` that maintains the current working directory stack (`List<PathSegment>`), coordinates command execution, and enforces centralized output limits (max 500 lines, 10,000 characters).
+3.  **`CommandDispatcher` (Logic):** A tokenizer and router that intercepts V1 syntax, blocks advanced shell features (pipes, host OS execution), and implements the core command logic.
+
+### Supported Commands Delivered
+*   **Navigation:** `pwd`, `cd <dir>`, `cd ..` (Stack-based, bounded to project root to prevent path traversal leaks).
+*   **Filesystem Read:** `ls` (sorted folders-first), `tree` (DFS, limited to depth 5 / 500 nodes), `cat` (UTF-8 decoding with 100KB size limit and null-byte binary heuristic).
+*   **Filesystem Write:** `mkdir`, `touch` (Includes atomic rollback if node creation succeeds but content initialization fails).
+*   **Utility:** `help`, `clear`.
+
+---
+
+## 3. Technical Challenges & Mitigations
+
+During implementation and on-device testing, we encountered and resolved several edge cases ranging from test contract violations to mobile-specific UX flaws. 
+
+### Challenge 1: Existing Widget Test Regressions
+*   **Problem:** Integrating the `TerminalView` into the Lab tab caused 7 existing regression tests (`widget_test.dart`, `nomad_branding_test.dart`) to fail.
+*   **Cause:** The initial implementation completely replaced the `_PhoneHomeLayout` widget. However, the existing test suite strictly enforced the presence of specific branding elements (Nomad Logo, product tagline, "Get Started" button) on the default Lab tab.
+*   **Mitigation:** We restructured the UI to be non-destructive. The terminal is now wrapped inside an `Expanded` widget beneath the original legacy branding `Column`, satisfying test assertions while providing the new terminal interface.
+
+### Challenge 2: Mobile UX Routing Blocked Terminal Access
+*   **Problem:** During physical device testing, opening a project caused the terminal to report `no active project`, and the terminal itself became inaccessible.
+*   **Cause:** The legacy phone layout (`app_shell.dart`) was designed to hide the bottom navigation bar and push a full-screen `WorkspaceView` the moment a project was opened. The terminal (bound to the Lab tab) could only be reached when *no* project was open.
+*   **Mitigation:** Surgically modified the application routing state. When a project is active, the bottom navigation bar now remains visible. The tabs contextually rename themselves from **[Lab / Projects]** to **[Terminal / Files]**, allowing the user to seamlessly toggle between the Terminal and the visual Workspace explorer within the active project.
+
+### Challenge 3: Hardware Notch Overlap & Text Overflow
+*   **Problem:** On a physical Android device, the terminal header rendered underneath the camera punch-hole / status bar, and long project names triggered a Flutter horizontal layout overflow (yellow/black tape).
+*   **Cause:** The new `TerminalView` lacked a `SafeArea` boundary, and the text displaying the current working directory was placed in a `Row` without `Expanded` constraints.
+*   **Mitigation:** Wrapped the terminal header in `SafeArea(bottom: false)` to push it below the system UI. Wrapped the path display in `Expanded` with `TextOverflow.ellipsis`, ensuring long names (`/project/Moonlit - The Unsent Letters...`) truncate cleanly.
+
+### Challenge 4: Shell Syntax Muscle Memory (`cd..`)
+*   **Problem:** Typing `cd..` resulted in an `Unknown command: "cd.."` error.
+*   **Cause:** The basic V1 tokenizer strictly split arguments by whitespace. It parsed `cd..` as a single literal command string rather than the command `cd` and argument `..`.
+*   **Mitigation:** Added a specific alias interceptor in the `_tokenize` method to gracefully handle `cd..` (and `cd..path`), automatically expanding it to `['cd', '..']` to support developer muscle memory.
+
+### Challenge 5: Flawed Edge-Case Logic in `tree` and `cat`
+*   **Problem (Tree):** The depth limit (5 levels) worked, but the `"output limited"` truncation message failed to trigger.
+*   **Cause:** The recursive DFS `walk()` function returned silently when hitting the depth limit without asserting if further unrendered children actually existed.
+*   **Fix:** Added a lookahead check: `if (childrenMap[parentId]?.isNotEmpty == true) { truncated = true; }`.
+*   **Problem (Cat):** `cat` size/binary limit tests failed, stating "No such file".
+*   **Cause:** The mock test data requested `main.dart` from the project root, but the test fixture defined `main.dart` inside a `src/` subfolder.
+*   **Fix:** Realigned the test payload to request `README.md`, which accurately resided at the fixture's root level.
+
+---
+
+## 4. Quality & Metrics
+
+*   **Test Suite:** 215 / 215 tests passing.
+*   **Coverage Added:** 40 new focused unit tests covering terminal routing, limits, navigation, and file operations.
+*   **Static Analysis:** 0 issues across all touched files (1 unrelated legacy warning on dead code `_PhoneHomeLayout`, kept intact to avoid unnecessary refactoring scope creep).
+*   **Performance:** Debug APK compiled successfully. The `ChangeNotifier` bound to the terminal performs efficiently under scrolling and rapid command execution.
+
+## 5. Next Steps / S-T2 Recommendations
+
+With the Project Shell foundation stable, S-T2 can safely focus on expanding the capability of the terminal without risking the host app:
+1.  **Command History:** Implement an up/down arrow history buffer in `TerminalController`.
+2.  **Destructive Operations:** Add `rm` (with safety prompts for recursive folder deletion).
+3.  **File Movement:** Add `mv` and `cp` using the existing `WorkspaceRepository` contracts.
+4.  **Refactoring:** Safely deprecate and remove `_PhoneHomeLayout` now that the layout logic has been merged into the main `AppShell` tree.
