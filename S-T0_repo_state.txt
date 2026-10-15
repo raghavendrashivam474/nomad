@@ -1,0 +1,12 @@
+﻿S-T0 Repository State Snapshot
+Generated: 2026-10-15 14:09:39
+Branch:    main
+HEAD:      85c3e78
+Remote:    https://github.com/raghavendrashivam474/nomad.git
+
+Working Tree Status:
+## main...origin/main
+
+Recent Commits:
+85c3e78 (HEAD -> main, tag: v-LC-3, origin/main, origin/HEAD) feat(lc3): implement background/foreground WebRTC connection recovery and grace period 6636b7d docs(lc3): add LC-3 background & foreground connection recovery documentation 0be11a6 (tag: v-LC-1) docs(lc2): add usage guide and developer integration manual for local connectivity a66f905 feat(server,ui): implement ADR-0010 hybrid transport delivery and fallback injection b75adb3 feat(lc2): add nomad-transport.js WebRTC driver and LAN Chat starter project
+    

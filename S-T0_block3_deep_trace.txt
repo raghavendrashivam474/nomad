@@ -1,0 +1,646 @@
+﻿===== packages/nomad_core/lib/nomad_core.dart =====
+/// Nomad Core domain library.
+library nomad_core;
+
+export 'src/errors/nomad_exception.dart';
+export 'src/identifiers/unique_id.dart';
+export 'src/domain/project_type.dart';
+export 'src/domain/project.dart';
+export 'src/domain/project_repository.dart';
+export 'src/domain/file_node_type.dart';
+export 'src/domain/file_node.dart';
+export 'src/domain/workspace_repository.dart';
+export 'src/domain/file_content_repository.dart';
+
+===== packages/nomad_core/lib/src/domain/project.dart =====
+import '../errors/nomad_exception.dart';
+import '../identifiers/unique_id.dart';
+import 'project_type.dart';
+
+/// Represents a Nomad development project.
+class Project {
+  final EntityId id;
+  final String name;
+  final ProjectType type;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  Project({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.createdAt,
+    required this.updatedAt,
+  }) {
+    if (name.trim().isEmpty) {
+      throw const ContractViolationException('Project name cannot be empty');
+    }
+  }
+
+  /// Creates a modified copy of the project ensuring immutability.
+  Project copyWith({
+    String? name,
+    ProjectType? type,
+    DateTime? updatedAt,
+  }) {
+    return Project(
+      id: id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+===== packages/nomad_core/lib/src/domain/file_node.dart =====
+import '../errors/nomad_exception.dart';
+import '../identifiers/unique_id.dart';
+import 'file_node_type.dart';
+
+/// Represents a file or folder within a project workspace.
+///
+/// Project isolation is enforced via [projectId]. A FileNode from
+/// Project A must never be resolvable under Project B.
+class FileNode {
+  final EntityId id;
+  final EntityId projectId;
+  final EntityId? parentId;
+  final String name;
+  final FileNodeType type;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  FileNode({
+    required this.id,
+    required this.projectId,
+    this.parentId,
+    required this.name,
+    required this.type,
+    required this.createdAt,
+    required this.updatedAt,
+  }) {
+    if (name.trim().isEmpty) {
+      throw const ContractViolationException('FileNode name cannot be empty');
+    }
+    if (name.contains('/') || name.contains('\\')) {
+      throw const ContractViolationException(
+        'FileNode name cannot contain path separators',
+      );
+    }
+  }
+
+  /// Whether this node is a file.
+  bool get isFile => type == FileNodeType.file;
+
+  /// Whether this node is a folder.
+  bool get isFolder => type == FileNodeType.folder;
+
+  /// Whether this node lives at the workspace root (no parent).
+  bool get isRoot => parentId == null;
+
+  /// Creates a modified copy preserving identity and project scope.
+  FileNode copyWith({
+    String? name,
+    EntityId? parentId,
+    DateTime? updatedAt,
+  }) {
+    return FileNode(
+      id: id,
+      projectId: projectId,
+      parentId: parentId ?? this.parentId,
+      name: name ?? this.name,
+      type: type,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FileNode && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
+===== packages/nomad_core/lib/src/domain/file_node_type.dart =====
+/// Distinguishes between files and folders in a workspace.
+enum FileNodeType {
+  file,
+  folder,
+}
+
+===== packages/nomad_core/lib/src/domain/project_type.dart =====
+/// Represents the supported development environments in Nomad.
+enum ProjectType {
+  web,
+  android,
+}
+
+===== packages/nomad_core/lib/src/domain/project_repository.dart =====
+import 'project.dart';
+import '../identifiers/unique_id.dart';
+
+/// Contract boundary for Project persistence.
+/// Pure Dart abstraction â€” infrastructure-agnostic.
+abstract class ProjectRepository {
+  /// Retrieves all projects.
+  Future<List<Project>> getAllProjects();
+
+  /// Retrieves a project by its unique ID. Returns null if not found.
+  Future<Project?> getProjectById(EntityId id);
+
+  /// Saves a project (creates new or replaces existing).
+  Future<void> saveProject(Project project);
+
+  /// Deletes a project by its unique ID.
+  Future<void> deleteProject(EntityId id);
+}
+
+===== packages/nomad_core/lib/src/domain/workspace_repository.dart =====
+import '../identifiers/unique_id.dart';
+import 'file_node.dart';
+
+/// Contract boundary for workspace file/folder operations.
+/// Pure Dart abstraction â€” infrastructure-agnostic.
+///
+/// All operations are scoped to a [projectId] to enforce
+/// project isolation.
+abstract class WorkspaceRepository {
+  /// Lists all nodes belonging to a project workspace.
+  Future<List<FileNode>> getNodesForProject(EntityId projectId);
+
+  /// Retrieves a single node by its ID.
+  /// Returns null if not found.
+  Future<FileNode?> getNodeById(EntityId id);
+
+  /// Creates a new file or folder node in the workspace.
+  Future<void> createNode(FileNode node);
+
+  /// Renames an existing node.
+  Future<void> renameNode(EntityId id, String newName);
+
+  /// Moves an existing node to a new parent folder, or to root if [newParentId] is null.
+  ///
+  /// Throws [DomainException] or [ContractViolationException] on invalid moves:
+  /// - Node does not exist
+  /// - Destination folder does not exist or is not a folder
+  /// - Moving a folder into itself or a descendant
+  /// - Destination already contains an item with the same name
+  /// - Cross-project moves
+  Future<void> moveNode(EntityId id, EntityId? newParentId);
+
+  /// Deletes a node. If the node is a folder, all children
+  /// are deleted recursively.
+  Future<void> deleteNode(EntityId id);
+
+  /// Deletes all nodes belonging to a project.
+  /// Called when a project is removed.
+  Future<void> deleteAllNodesForProject(EntityId projectId);
+}
+
+===== packages/nomad_core/lib/src/domain/file_content_repository.dart =====
+import 'dart:convert';
+
+import '../identifiers/unique_id.dart';
+
+/// Contract boundary for file content persistence.
+/// Pure Dart abstraction â€” infrastructure-agnostic.
+abstract class FileContentRepository {
+  /// Reads the content of a file as a UTF-8 string.
+  /// Returns empty string if file has no content yet.
+  Future<String> readFile(EntityId projectId, EntityId fileNodeId);
+
+  /// Writes string content to a file.
+  Future<void> writeFile(
+      EntityId projectId, EntityId fileNodeId, String content);
+
+  /// Reads the content of a file as raw bytes.
+  /// Returns an empty list if the file has no content yet.
+  ///
+  /// The default implementation delegates to [readFile] and UTF-8 encodes
+  /// the result. Override for true binary-safe storage.
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    final text = await readFile(projectId, fileNodeId);
+    return utf8.encode(text);
+  }
+
+  /// Writes raw bytes to a file.
+  ///
+  /// The default implementation UTF-8 decodes the bytes and delegates to
+  /// [writeFile]. Override for true binary-safe storage.
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    await writeFile(projectId, fileNodeId, utf8.decode(bytes));
+  }
+
+  /// Deletes the content file.
+  Future<void> deleteContent(EntityId projectId, EntityId fileNodeId);
+
+  /// Deletes all file contents associated with a project.
+  Future<void> deleteAllContentForProject(EntityId projectId);
+}
+
+===== packages/nomad_core/lib/src/identifiers/unique_id.dart =====
+/// A lightweight unique identifier wrapper for domain entities.
+class EntityId {
+  final String value;
+
+  const EntityId(this.value)
+      : assert(value.length > 0, 'EntityId cannot be empty');
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntityId &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => value;
+}
+
+===== packages/nomad_core/lib/src/errors/nomad_exception.dart =====
+/// Base exception class for all domain-level errors in Nomad.
+abstract class NomadException implements Exception {
+  final String message;
+  final String? code;
+  final Object? cause;
+
+  const NomadException(this.message, {this.code, this.cause});
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('NomadException: $message');
+    if (code != null) buffer.write(' [Code: $code]');
+    if (cause != null) buffer.write(' (Cause: $cause)');
+    return buffer.toString();
+  }
+}
+
+/// Thrown when an invalid state transition or operation occurs.
+class DomainException extends NomadException {
+  const DomainException(super.message, {super.code, super.cause});
+}
+
+/// Thrown when contract preconditions or invariants are violated.
+class ContractViolationException extends NomadException {
+  const ContractViolationException(super.message, {super.code, super.cause});
+}
+
+===== apps/nomad_mobile/lib/data/repositories/local_workspace_repository.dart =====
+import 'package:nomad_core/nomad_core.dart';
+import 'package:sqflite/sqflite.dart';
+import '../database/app_database.dart';
+import '../mappers/file_node_mapper.dart';
+
+class LocalWorkspaceRepository implements WorkspaceRepository {
+  final Future<Database> Function() _dbProvider;
+
+  LocalWorkspaceRepository({Future<Database> Function()? dbProvider})
+      : _dbProvider = dbProvider ?? (() => AppDatabase.database);
+
+  @override
+  Future<List<FileNode>> getNodesForProject(EntityId projectId) async {
+    final db = await _dbProvider();
+    final rows = await db.query(
+      AppDatabase.tableFileNodes,
+      where: '${AppDatabase.columnProjectId} = ?',
+      whereArgs: [projectId.value],
+      orderBy: '${AppDatabase.columnType} DESC, ${AppDatabase.columnName} ASC',
+    );
+    return rows.map(FileNodeMapper.fromMap).toList();
+  }
+
+  @override
+  Future<FileNode?> getNodeById(EntityId id) async {
+    final db = await _dbProvider();
+    final rows = await db.query(
+      AppDatabase.tableFileNodes,
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+    return FileNodeMapper.fromMap(rows.first);
+  }
+
+  @override
+  Future<void> createNode(FileNode node) async {
+    final db = await _dbProvider();
+    await db.insert(
+      AppDatabase.tableFileNodes,
+      FileNodeMapper.toMap(node),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<void> renameNode(EntityId id, String newName) async {
+    if (newName.trim().isEmpty ||
+        newName.contains('/') ||
+        newName.contains('\\')) {
+      throw const ContractViolationException('Invalid file name');
+    }
+
+    final db = await _dbProvider();
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      AppDatabase.tableFileNodes,
+      {
+        AppDatabase.columnName: newName,
+        AppDatabase.columnUpdatedAt: now,
+      },
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+    );
+  }
+
+  @override
+  Future<void> moveNode(EntityId id, EntityId? newParentId) async {
+    final db = await _dbProvider();
+
+    // 1. Verify source node exists
+    final sourceNode = await getNodeById(id);
+    if (sourceNode == null) {
+      throw const DomainException('Source node does not exist');
+    }
+
+    // 2. If moving to same parent, it's a no-op
+    if (sourceNode.parentId == newParentId) {
+      return;
+    }
+
+    // 3. Prevent self-move
+    if (newParentId != null && sourceNode.id == newParentId) {
+      throw const DomainException('Cannot move a node into itself');
+    }
+
+    // 4. Validate destination if not root
+    if (newParentId != null) {
+      final targetFolder = await getNodeById(newParentId);
+      if (targetFolder == null) {
+        throw const DomainException('Destination folder does not exist');
+      }
+      if (!targetFolder.isFolder) {
+        throw const DomainException('Destination must be a folder');
+      }
+      if (targetFolder.projectId != sourceNode.projectId) {
+        throw const DomainException('Cannot move across projects');
+      }
+
+      // 5. Prevent moving a folder into any of its own descendants (cycle prevention)
+      if (sourceNode.isFolder) {
+        EntityId? currentAncestorId = targetFolder.parentId;
+        while (currentAncestorId != null) {
+          if (currentAncestorId == sourceNode.id) {
+            throw const DomainException(
+              'Cannot move a folder into one of its descendants',
+            );
+          }
+          final ancestor = await getNodeById(currentAncestorId);
+          currentAncestorId = ancestor?.parentId;
+        }
+      }
+    }
+
+    // 6. Check for sibling name collisions at the destination
+    final siblingRows = await db.query(
+      AppDatabase.tableFileNodes,
+      where: newParentId == null
+          ? '${AppDatabase.columnProjectId} = ? AND ${AppDatabase.columnParentId} IS NULL AND ${AppDatabase.columnName} = ?'
+          : '${AppDatabase.columnProjectId} = ? AND ${AppDatabase.columnParentId} = ? AND ${AppDatabase.columnName} = ?',
+      whereArgs: newParentId == null
+          ? [sourceNode.projectId.value, sourceNode.name]
+          : [sourceNode.projectId.value, newParentId.value, sourceNode.name],
+    );
+
+    if (siblingRows.isNotEmpty) {
+      throw DomainException(
+        'An item named "${sourceNode.name}" already exists in the destination folder',
+      );
+    }
+
+    // 7. Perform the atomic update
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      AppDatabase.tableFileNodes,
+      {
+        AppDatabase.columnParentId: newParentId?.value,
+        AppDatabase.columnUpdatedAt: now,
+      },
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+    );
+  }
+
+  @override
+  Future<void> deleteNode(EntityId id) async {
+    final db = await _dbProvider();
+
+    // Recursively collect all descendant IDs if the node is a folder
+    final idsToDelete = <String>[id.value];
+    var frontier = <String>[id.value];
+
+    while (frontier.isNotEmpty) {
+      final placeholders = List.filled(frontier.length, '?').join(',');
+      final childRows = await db.query(
+        AppDatabase.tableFileNodes,
+        columns: [AppDatabase.columnId],
+        where: '${AppDatabase.columnParentId} IN ($placeholders)',
+        whereArgs: frontier,
+      );
+
+      final childIds =
+          childRows.map((r) => r[AppDatabase.columnId] as String).toList();
+
+      idsToDelete.addAll(childIds);
+      frontier = childIds;
+    }
+
+    final deletePlaceholders = List.filled(idsToDelete.length, '?').join(',');
+    await db.delete(
+      AppDatabase.tableFileNodes,
+      where: '${AppDatabase.columnId} IN ($deletePlaceholders)',
+      whereArgs: idsToDelete,
+    );
+  }
+
+  @override
+  Future<void> deleteAllNodesForProject(EntityId projectId) async {
+    final db = await _dbProvider();
+    await db.delete(
+      AppDatabase.tableFileNodes,
+      where: '${AppDatabase.columnProjectId} = ?',
+      whereArgs: [projectId.value],
+    );
+  }
+}
+
+===== apps/nomad_mobile/lib/data/repositories/local_file_content_repository.dart =====
+import 'dart:io';
+
+import 'package:nomad_core/nomad_core.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+class LocalFileContentRepository implements FileContentRepository {
+  final Future<Directory> Function() _baseDirProvider;
+
+  LocalFileContentRepository({Future<Directory> Function()? baseDirProvider})
+      : _baseDirProvider = baseDirProvider ?? getApplicationDocumentsDirectory;
+
+  Future<File> _getFile(EntityId projectId, EntityId fileNodeId) async {
+    final baseDir = await _baseDirProvider();
+    final filePath = p.join(
+      baseDir.path,
+      'nomad_workspaces',
+      projectId.value,
+      '${fileNodeId.value}.txt',
+    );
+    return File(filePath);
+  }
+
+  @override
+  Future<String> readFile(EntityId projectId, EntityId fileNodeId) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      if (file.existsSync()) {
+        return file.readAsStringSync();
+      }
+      return '';
+    } catch (e) {
+      throw DomainException('Failed to read file content', cause: e);
+    }
+  }
+
+  @override
+  Future<void> writeFile(
+      EntityId projectId, EntityId fileNodeId, String content) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      file.createSync(recursive: true);
+      file.writeAsStringSync(content);
+    } catch (e) {
+      throw DomainException('Failed to write file content', cause: e);
+    }
+  }
+
+  @override
+  Future<List<int>> readFileBytes(
+      EntityId projectId, EntityId fileNodeId) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      if (file.existsSync()) {
+        return file.readAsBytesSync();
+      }
+      return <int>[];
+    } catch (e) {
+      throw DomainException('Failed to read file bytes', cause: e);
+    }
+  }
+
+  @override
+  Future<void> writeFileBytes(
+      EntityId projectId, EntityId fileNodeId, List<int> bytes) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      file.createSync(recursive: true);
+      file.writeAsBytesSync(bytes);
+    } catch (e) {
+      throw DomainException('Failed to write file bytes', cause: e);
+    }
+  }
+
+  @override
+  Future<void> deleteContent(EntityId projectId, EntityId fileNodeId) async {
+    try {
+      final file = await _getFile(projectId, fileNodeId);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+    } catch (e) {
+      throw DomainException('Failed to delete file content', cause: e);
+    }
+  }
+
+  @override
+  Future<void> deleteAllContentForProject(EntityId projectId) async {
+    try {
+      final baseDir = await _baseDirProvider();
+      final projectDir = Directory(
+        p.join(baseDir.path, 'nomad_workspaces', projectId.value),
+      );
+      if (projectDir.existsSync()) {
+        projectDir.deleteSync(recursive: true);
+      }
+    } catch (e) {
+      throw DomainException('Failed to delete project file contents', cause: e);
+    }
+  }
+}
+
+===== apps/nomad_mobile/lib/data/repositories/local_project_repository.dart =====
+import 'package:nomad_core/nomad_core.dart';
+import 'package:sqflite/sqflite.dart';
+import '../database/app_database.dart';
+import '../mappers/project_mapper.dart';
+
+class LocalProjectRepository implements ProjectRepository {
+  final Future<Database> Function() _dbProvider;
+
+  LocalProjectRepository({Future<Database> Function()? dbProvider})
+      : _dbProvider = dbProvider ?? (() => AppDatabase.database);
+
+  @override
+  Future<List<Project>> getAllProjects() async {
+    final db = await _dbProvider();
+    final rows = await db.query(
+      AppDatabase.tableProjects,
+      orderBy: '${AppDatabase.columnUpdatedAt} DESC',
+    );
+    return rows.map(ProjectMapper.fromMap).toList();
+  }
+
+  @override
+  Future<Project?> getProjectById(EntityId id) async {
+    final db = await _dbProvider();
+    final rows = await db.query(
+      AppDatabase.tableProjects,
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+    return ProjectMapper.fromMap(rows.first);
+  }
+
+  @override
+  Future<void> saveProject(Project project) async {
+    final db = await _dbProvider();
+    await db.insert(
+      AppDatabase.tableProjects,
+      ProjectMapper.toMap(project),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<void> deleteProject(EntityId id) async {
+    final db = await _dbProvider();
+    await db.delete(
+      AppDatabase.tableProjects,
+      where: '${AppDatabase.columnId} = ?',
+      whereArgs: [id.value],
+    );
+  }
+}
+
