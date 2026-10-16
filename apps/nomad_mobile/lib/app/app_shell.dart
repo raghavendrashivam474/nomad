@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../activity/activity_controller.dart';
 import '../branding/nomad_brand.dart';
@@ -38,7 +38,6 @@ class _AppShellState extends State<AppShell> {
   final List<FileNode> _openTabs = [];
   FileNode? _activeFileNode;
   bool _showPreview = false;
-  bool _showTerminalPanel = false;
   int _previewVersion = 0;
   double _explorerWidth = kDefaultExplorerWidth;
 
@@ -95,7 +94,6 @@ class _AppShellState extends State<AppShell> {
       _openTabs.clear();
       _activeFileNode = null;
       _showPreview = false;
-      _showTerminalPanel = false;
       _previewVersion = 0;
     });
   }
@@ -120,14 +118,20 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  Future<void> _navigateToSource(String sourceUri, int? line, int? column) async {
+  Future<void> _navigateToSource(
+      String sourceUri, int? line, int? column) async {
     if (_selectedProject == null) return;
     try {
       final nodes = await widget.workspaceRepository
           .getNodesForProject(_selectedProject!.id);
 
-      final filename = sourceUri.split('/').where((s) => s.isNotEmpty).lastOrNull ?? sourceUri;
-      final targetNode = nodes.where((n) => n.isFile && n.name == filename).firstOrNull;
+      final filename = sourceUri
+              .split('/')
+              .where((s) => s.isNotEmpty)
+              .lastOrNull ??
+          sourceUri;
+      final targetNode =
+          nodes.where((n) => n.isFile && n.name == filename).firstOrNull;
 
       if (targetNode != null) {
         setState(() {
@@ -229,209 +233,264 @@ class _AppShellState extends State<AppShell> {
               ? isTablet
                   ? Row(
                       children: [
-                        SizedBox(
-                          width: _explorerWidth.clamp(
-                            kMinExplorerWidth,
-                            (constraints.maxWidth * kMaxExplorerFraction).clamp(
-                                kMinExplorerWidth,
-                                constraints.maxWidth - kMinEditorWidth),
+                        NavigationRail(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: (idx) =>
+                              setState(() => _selectedIndex = idx),
+                          leading: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12.0),
+                            child: NomadLogo(size: 40, showBorder: true),
                           ),
-                          child: WorkspaceView(
-                            project: _selectedProject!,
-                            workspaceRepository: widget.workspaceRepository,
-                            selectedNodeId: _activeFileNode?.id,
-                            onFileSelected: _onFileSelected,
-                            onBack: _onProjectDeselected,
-                          ),
-                        ),
-                        _ResizableDivider(
-                          key: const Key('workspace_resizable_divider'),
-                          onDragUpdate: (details) => _onResizeDividerDrag(
-                              details, constraints.maxWidth),
-                        ),
-                        Expanded(
-                          child: Column(
-                            children: [
-                          Container(
-                            height: 32,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerRight,
-                            child: IconButton(
-                              icon: Icon(
-                                _showTerminalPanel
-                                    ? Icons.terminal
-                                    : Icons.terminal_outlined,
-                                size: 18,
-                              ),
-                              onPressed: () => setState(
-                                  () => _showTerminalPanel = !_showTerminalPanel),
-                              tooltip: 'Toggle Terminal',
-                              constraints: const BoxConstraints(
-                                  minWidth: 32, minHeight: 32),
-                              padding: EdgeInsets.zero,
+                          labelType: NavigationRailLabelType.all,
+                          destinations: const [
+                            NavigationRailDestination(
+                              icon: Icon(Icons.terminal_outlined),
+                              selectedIcon: Icon(Icons.terminal),
+                              label: Text('Lab'),
                             ),
-                          ),
-                              if (_openTabs.isNotEmpty)
-                                Container(
-                                  height: 42,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withAlpha(80),
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: _openTabs.length,
-                                    itemBuilder: (context, idx) {
-                                      final tab = _openTabs[idx];
-                                      final isActive =
-                                          _activeFileNode?.id == tab.id;
-                                      return InkWell(
-                                        key: Key('tab_${tab.name}'),
-                                        onTap: () => setState(
-                                            () => _activeFileNode = tab),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            color: isActive
-                                                ? Theme.of(context)
-                                                    .colorScheme
-                                                    .surface
-                                                : Colors.transparent,
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: isActive
-                                                    ? Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
-                                                    : Colors.transparent,
-                                                width: 2,
-                                              ),
-                                              right: BorderSide(
-                                                color: Theme.of(context)
-                                                    .dividerColor
-                                                    .withAlpha(50),
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.description_outlined,
-                                                  size: 16,
-                                                  color: isActive
-                                                      ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                      : null),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                tab.name,
-                                                style: TextStyle(
-                                                  fontWeight: isActive
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
-                                                  color: isActive
-                                                      ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                      : null,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              GestureDetector(
-                                                key: Key(
-                                                    'close_tab_${tab.name}'),
-                                                onTap: () => _closeTab(tab),
-                                                child: const Icon(Icons.close,
-                                                    size: 14),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              Expanded(
-                                child: _activeFileNode != null
-                                    ? Row(
-                                        children: [
-                                          Expanded(
-                                            child: EditorView(
-                                              key: ValueKey(
-                                                  _activeFileNode!.id.value),
-                                              fileNode: _activeFileNode!,
-                                              contentRepository:
-                                                  widget.contentRepository,
-                                              onClose: _closeEditor,
-                                              onPreview: () => setState(() =>
-                                                  _showPreview = !_showPreview),
-                                              isPreviewActive: _showPreview,
-                                              onSaveCompleted: () =>
-                                                  _handleSaveCompleted(
-                                                      _activeFileNode!),
-                                            ),
-                                          ),
-                                          if (_showPreview) ...[
-                                            const VerticalDivider(
-                                                thickness: 1, width: 1),
-                                            Expanded(
-                                              child: WebPreviewView(
-                                                key: ValueKey(
-                                                    'preview_${_selectedProject!.id.value}'),
-                                                project: _selectedProject!,
-                                                workspaceRepository:
-                                                    widget.workspaceRepository,
-                                                contentRepository:
-                                                    widget.contentRepository,
-                                                previewVersion: _previewVersion,
-                                                activityController: _activityController,
-                                                onNavigateToSource: _navigateToSource,
-                                                onClose: () => setState(
-                                                    () => _showPreview = false),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      )
-                                    : Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.code,
-                                              size: 64,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .outline,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              'Select a file from the workspace to edit',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyLarge
-                                                  ?.copyWith(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                              ),
-                          if (_showTerminalPanel) ...[
-                            const Divider(height: 1),
-                            SizedBox(
-                              height: 200,
-                              child: TerminalView(controller: _terminalController),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.folder_outlined),
+                              selectedIcon: Icon(Icons.folder),
+                              label: Text('Projects'),
                             ),
                           ],
-                            ],
-                          ),
+                        ),
+                        const VerticalDivider(thickness: 1, width: 1),
+                        Expanded(
+                          child: _selectedIndex == 0
+                              ? TerminalView(
+                                  controller: _terminalController)
+                              : Row(
+                                  children: [
+                                    SizedBox(
+                                      width: _explorerWidth.clamp(
+                                        kMinExplorerWidth,
+                                        (constraints.maxWidth *
+                                                kMaxExplorerFraction)
+                                            .clamp(
+                                                kMinExplorerWidth,
+                                                constraints.maxWidth -
+                                                    kMinEditorWidth),
+                                      ),
+                                      child: WorkspaceView(
+                                        project: _selectedProject!,
+                                        workspaceRepository:
+                                            widget.workspaceRepository,
+                                        selectedNodeId: _activeFileNode?.id,
+                                        onFileSelected: _onFileSelected,
+                                        onBack: _onProjectDeselected,
+                                      ),
+                                    ),
+                                    _ResizableDivider(
+                                      key: const Key(
+                                          'workspace_resizable_divider'),
+                                      onDragUpdate: (details) =>
+                                          _onResizeDividerDrag(
+                                              details, constraints.maxWidth),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        children: [
+                                          if (_openTabs.isNotEmpty)
+                                            Container(
+                                              height: 42,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest
+                                                  .withAlpha(80),
+                                              child: ListView.builder(
+                                                scrollDirection:
+                                                    Axis.horizontal,
+                                                itemCount: _openTabs.length,
+                                                itemBuilder: (context, idx) {
+                                                  final tab = _openTabs[idx];
+                                                  final isActive =
+                                                      _activeFileNode?.id ==
+                                                          tab.id;
+                                                  return InkWell(
+                                                    key: Key(
+                                                        'tab_${tab.name}'),
+                                                    onTap: () => setState(
+                                                        () => _activeFileNode =
+                                                            tab),
+                                                    child: Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 12),
+                                                      decoration: BoxDecoration(
+                                                        color: isActive
+                                                            ? Theme.of(context)
+                                                                .colorScheme
+                                                                .surface
+                                                            : Colors
+                                                                .transparent,
+                                                        border: Border(
+                                                          bottom: BorderSide(
+                                                            color: isActive
+                                                                ? Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .primary
+                                                                : Colors
+                                                                    .transparent,
+                                                            width: 2,
+                                                          ),
+                                                          right: BorderSide(
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .dividerColor
+                                                                .withAlpha(50),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .description_outlined,
+                                                              size: 16,
+                                                              color: isActive
+                                                                  ? Theme.of(
+                                                                          context)
+                                                                      .colorScheme
+                                                                      .primary
+                                                                  : null),
+                                                          const SizedBox(
+                                                              width: 6),
+                                                          Text(
+                                                            tab.name,
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                                  isActive
+                                                                      ? FontWeight
+                                                                          .bold
+                                                                      : FontWeight
+                                                                          .normal,
+                                                              color: isActive
+                                                                  ? Theme.of(
+                                                                          context)
+                                                                      .colorScheme
+                                                                      .primary
+                                                                  : null,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 8),
+                                                          GestureDetector(
+                                                            key: Key(
+                                                                'close_tab_${tab.name}'),
+                                                            onTap: () =>
+                                                                _closeTab(tab),
+                                                            child: const Icon(
+                                                                Icons.close,
+                                                                size: 14),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          Expanded(
+                                            child: _activeFileNode != null
+                                                ? Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: EditorView(
+                                                          key: ValueKey(
+                                                              _activeFileNode!
+                                                                  .id.value),
+                                                          fileNode:
+                                                              _activeFileNode!,
+                                                          contentRepository:
+                                                              widget
+                                                                  .contentRepository,
+                                                          onClose:
+                                                              _closeEditor,
+                                                          onPreview: () =>
+                                                              setState(() =>
+                                                                  _showPreview =
+                                                                      !_showPreview),
+                                                          isPreviewActive:
+                                                              _showPreview,
+                                                          onSaveCompleted: () =>
+                                                              _handleSaveCompleted(
+                                                                  _activeFileNode!),
+                                                        ),
+                                                      ),
+                                                      if (_showPreview) ...[
+                                                        const VerticalDivider(
+                                                            thickness: 1,
+                                                            width: 1),
+                                                        Expanded(
+                                                          child:
+                                                              WebPreviewView(
+                                                            key: ValueKey(
+                                                                'preview_${_selectedProject!.id.value}'),
+                                                            project:
+                                                                _selectedProject!,
+                                                            workspaceRepository:
+                                                                widget
+                                                                    .workspaceRepository,
+                                                            contentRepository:
+                                                                widget
+                                                                    .contentRepository,
+                                                            previewVersion:
+                                                                _previewVersion,
+                                                            activityController:
+                                                                _activityController,
+                                                            onNavigateToSource:
+                                                                _navigateToSource,
+                                                            onClose: () =>
+                                                                setState(() =>
+                                                                    _showPreview =
+                                                                        false),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  )
+                                                : Center(
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.code,
+                                                          size: 64,
+                                                          color: Theme.of(
+                                                                  context)
+                                                              .colorScheme
+                                                              .outline,
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 16),
+                                                        Text(
+                                                          'Select a file from the workspace to edit',
+                                                          style: Theme.of(
+                                                                  context)
+                                                              .textTheme
+                                                              .bodyLarge
+                                                              ?.copyWith(
+                                                                color: Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .onSurfaceVariant,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ],
                     )
@@ -459,7 +518,8 @@ class _AppShellState extends State<AppShell> {
                       ? Column(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(NomadBrand.space16),
+                              padding:
+                                  const EdgeInsets.all(NomadBrand.space16),
                               child: Column(
                                 children: [
                                   const NomadLogo(size: 48, showBorder: true),
@@ -490,7 +550,8 @@ class _AppShellState extends State<AppShell> {
                                     key: const Key('get_started_button'),
                                     onPressed: () =>
                                         setState(() => _selectedIndex = 1),
-                                    icon: const Icon(Icons.play_arrow_rounded),
+                                    icon:
+                                        const Icon(Icons.play_arrow_rounded),
                                     label: const Text('Get Started'),
                                   ),
                                 ],
@@ -683,7 +744,7 @@ class _TabletLayout extends StatelessWidget {
                             const NomadLogo(size: 80, showBorder: true),
                             const SizedBox(height: NomadBrand.space16),
                             Text(
-                              '${NomadBrand.productName} — ${NomadBrand.tagline}',
+                              '${NomadBrand.productName} \u2014 ${NomadBrand.tagline}',
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
                                   .textTheme
@@ -705,13 +766,13 @@ class _TabletLayout extends StatelessWidget {
                                         .onSurfaceVariant,
                                   ),
                             ),
-                          const SizedBox(height: NomadBrand.space12),
-                          FilledButton.icon(
-                            key: const Key('get_started_button'),
-                            onPressed: () => onDestinationSelected(1),
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Get Started'),
-                          ),
+                            const SizedBox(height: NomadBrand.space12),
+                            FilledButton.icon(
+                              key: const Key('get_started_button'),
+                              onPressed: () => onDestinationSelected(1),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: const Text('Get Started'),
+                            ),
                           ],
                         ),
                       ),
