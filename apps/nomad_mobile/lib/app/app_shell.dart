@@ -38,6 +38,7 @@ class _AppShellState extends State<AppShell> {
   final List<FileNode> _openTabs = [];
   FileNode? _activeFileNode;
   bool _showPreview = false;
+  bool _showTerminalPanel = false;
   int _previewVersion = 0;
   double _explorerWidth = kDefaultExplorerWidth;
 
@@ -94,6 +95,7 @@ class _AppShellState extends State<AppShell> {
       _openTabs.clear();
       _activeFileNode = null;
       _showPreview = false;
+      _showTerminalPanel = false;
       _previewVersion = 0;
     });
   }
@@ -250,6 +252,25 @@ class _AppShellState extends State<AppShell> {
                         Expanded(
                           child: Column(
                             children: [
+                          Container(
+                            height: 32,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            alignment: Alignment.centerRight,
+                            child: IconButton(
+                              icon: Icon(
+                                _showTerminalPanel
+                                    ? Icons.terminal
+                                    : Icons.terminal_outlined,
+                                size: 18,
+                              ),
+                              onPressed: () => setState(
+                                  () => _showTerminalPanel = !_showTerminalPanel),
+                              tooltip: 'Toggle Terminal',
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
                               if (_openTabs.isNotEmpty)
                                 Container(
                                   height: 42,
@@ -402,6 +423,13 @@ class _AppShellState extends State<AppShell> {
                                         ),
                                       ),
                               ),
+                          if (_showTerminalPanel) ...[
+                            const Divider(height: 1),
+                            SizedBox(
+                              height: 200,
+                              child: TerminalView(controller: _terminalController),
+                            ),
+                          ],
                             ],
                           ),
                         ),
@@ -630,8 +658,8 @@ class _TabletLayout extends StatelessWidget {
             labelType: NavigationRailLabelType.all,
             destinations: const [
               NavigationRailDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
+                icon: Icon(Icons.terminal_outlined),
+                selectedIcon: Icon(Icons.terminal),
                 label: Text('Lab'),
               ),
               NavigationRailDestination(
@@ -666,7 +694,7 @@ class _TabletLayout extends StatelessWidget {
                             ),
                             const SizedBox(height: NomadBrand.space12),
                             Text(
-                              'Responsive Tablet Foundation Active',
+                              NomadBrand.subTagline,
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
                                   .textTheme
@@ -677,6 +705,13 @@ class _TabletLayout extends StatelessWidget {
                                         .onSurfaceVariant,
                                   ),
                             ),
+                          const SizedBox(height: NomadBrand.space12),
+                          FilledButton.icon(
+                            key: const Key('get_started_button'),
+                            onPressed: () => onDestinationSelected(1),
+                            icon: const Icon(Icons.play_arrow_rounded),
+                            label: const Text('Get Started'),
+                          ),
                           ],
                         ),
                       ),
