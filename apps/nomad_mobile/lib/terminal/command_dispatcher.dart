@@ -65,6 +65,8 @@ class CommandDispatcher {
     'mkdir',
     'touch',
     'cat',
+    'rm',
+    'rmdir',
   ];
 
   /// Maximum tree traversal depth from the starting directory.
@@ -105,6 +107,10 @@ class CommandDispatcher {
         return await _touch(args, context);
       case 'cat':
         return await _cat(args, context);
+      case 'rm':
+        return await _rm(args, context);
+      case 'rmdir':
+        return await _rmdir(args, context);
       default:
         return CommandResult(
           output:
@@ -144,6 +150,8 @@ class CommandDispatcher {
       '  mkdir <name>    Create a new folder',
       '  touch <name>    Create a new empty file',
       '  cat <file>      Display file contents',
+      '  rm <file>       Remove a file',
+      '  rmdir <dir>     Remove an empty directory',
       '',
       'V1 Limitations:',
       '  No pipes, redirection, chaining, globbing, quoting,',
@@ -596,6 +604,127 @@ class CommandDispatcher {
     }
   }
 
+
+  // ── rm ────────────────────────────────────────────────────────────────
+
+  Future<CommandResult> _rm(
+      List<String> args, CommandContext context) async {
+    if (context.activeProject == null) {
+      return const CommandResult(
+          output: 'No active project.', isError: true);
+    }
+    if (args.isEmpty) {
+      return const CommandResult(
+          output: 'Usage: rm <file>', isError: true);
+    }
+
+    final name = args.first;
+    if (name.contains('/') ||
+        name.contains('\\') ||
+        name == '..' ||
+        name == '.') {
+      return CommandResult(
+          output: 'Invalid file name: "$name"', isError: true);
+    }
+
+    if (context.workspaceRepository == null ||
+        context.contentRepository == null) {
+      return const CommandResult(
+          output: 'Workspace not available.', isError: true);
+    }
+
+    try {
+      final nodes = await context.workspaceRepository!
+          .getNodesForProject(context.activeProject!.id);
+      final matches = nodes
+          .where(
+              (n) => n.name == name && n.parentId == context.currentFolderId)
+          .toList();
+
+      if (matches.isEmpty) {
+        return CommandResult(
+            output: 'No such file: "$name"', isError: true);
+      }
+
+      final node = matches.first;
+      if (node.isFolder) {
+        return CommandResult(
+            output: '"$name" is a directory. Use rmdir.', isError: true);
+      }
+
+      await context.contentRepository!
+          .deleteContent(context.activeProject!.id, node.id);
+      await context.workspaceRepository!.deleteNode(node.id);
+
+      return CommandResult(output: 'Removed: $name');
+    } on NomadException catch (e) {
+      return CommandResult(output: 'Error: ${e.message}', isError: true);
+    } catch (e) {
+      return CommandResult(output: 'Error: $e', isError: true);
+    }
+  }
+
+  // ── rmdir ─────────────────────────────────────────────────────────────
+
+  Future<CommandResult> _rmdir(
+      List<String> args, CommandContext context) async {
+    if (context.activeProject == null) {
+      return const CommandResult(
+          output: 'No active project.', isError: true);
+    }
+    if (args.isEmpty) {
+      return const CommandResult(
+          output: 'Usage: rmdir <dir>', isError: true);
+    }
+
+    final name = args.first;
+    if (name.contains('/') ||
+        name.contains('\\') ||
+        name == '..' ||
+        name == '.') {
+      return CommandResult(
+          output: 'Invalid directory name: "$name"', isError: true);
+    }
+
+    if (context.workspaceRepository == null) {
+      return const CommandResult(
+          output: 'Workspace not available.', isError: true);
+    }
+
+    try {
+      final nodes = await context.workspaceRepository!
+          .getNodesForProject(context.activeProject!.id);
+      final matches = nodes
+          .where(
+              (n) => n.name == name && n.parentId == context.currentFolderId)
+          .toList();
+
+      if (matches.isEmpty) {
+        return CommandResult(
+            output: 'No such directory: "$name"', isError: true);
+      }
+
+      final node = matches.first;
+      if (!node.isFolder) {
+        return CommandResult(
+            output: '"$name" is a file, not a directory.', isError: true);
+      }
+
+      final hasChildren = nodes.any((n) => n.parentId == node.id);
+      if (hasChildren) {
+        return CommandResult(
+            output: '"$name" is not empty.', isError: true);
+      }
+
+      await context.workspaceRepository!.deleteNode(node.id);
+
+      return CommandResult(output: 'Removed directory: $name/');
+    } on NomadException catch (e) {
+      return CommandResult(output: 'Error: ${e.message}', isError: true);
+    } catch (e) {
+      return CommandResult(output: 'Error: $e', isError: true);
+    }
+  }
   String _guessMime(String ext) {
     const map = {
       'png': 'image/png',
