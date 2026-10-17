@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
 import '../branding/nomad_brand.dart';
 import '../data/templates/web_template.dart';
+import '../data/templates/android_template.dart';
 
 class ProjectsView extends StatefulWidget {
   final ProjectRepository repository;
@@ -85,6 +86,11 @@ class _ProjectsViewState extends State<ProjectsView> {
           await contents.writeFile(projectId, node.id, entry.value);
         }
       }
+
+      if (type == ProjectType.android && workspace != null && contents != null) {
+        await _createAndroidProjectFiles(
+            projectId, workspace, contents, now);
+      }
     } catch (e) {
       // Partial failure: roll back everything we may have written.
       try {
@@ -108,6 +114,76 @@ class _ProjectsViewState extends State<ProjectsView> {
     }
 
     await _loadProjects();
+  }
+
+
+  /// Creates the folder tree and file nodes for an Android project.
+  ///
+  /// Android projects have nested directories (e.g. app/src/main/java/...).
+  /// This method creates folder [FileNode]s first, then file nodes under
+  /// the correct parent, and finally writes content for each file.
+  Future<void> _createAndroidProjectFiles(
+    EntityId projectId,
+    WorkspaceRepository workspace,
+    FileContentRepository contents,
+    DateTime now,
+  ) async {
+    // Collect all unique directory paths from the template.
+    final dirPaths = <String>{};
+    for (final filePath in AndroidTemplate.files.keys) {
+      final parts = filePath.split("/");
+      for (var i = 1; i < parts.length; i++) {
+        dirPaths.add(parts.sublist(0, i).join("/"));
+      }
+    }
+
+    // Sort by depth so parents are created before children.
+    final sortedDirs = dirPaths.toList()
+      ..sort((a, b) => a.split("/").length.compareTo(b.split("/").length));
+
+    // Map from logical directory path to its FileNode id.
+    final dirNodeIds = <String, EntityId>{};
+
+    for (final dirPath in sortedDirs) {
+      final parts = dirPath.split("/");
+      final dirName = parts.last;
+      final parentPath =
+          parts.length > 1 ? parts.sublist(0, parts.length - 1).join("/") : null;
+      final parentId = parentPath != null ? dirNodeIds[parentPath] : null;
+
+      final node = FileNode(
+        id: EntityId(const Uuid().v4()),
+        projectId: projectId,
+        parentId: parentId,
+        name: dirName,
+        type: FileNodeType.folder,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await workspace.createNode(node);
+      dirNodeIds[dirPath] = node.id;
+    }
+
+    // Create file nodes and write content.
+    for (final entry in AndroidTemplate.files.entries) {
+      final parts = entry.key.split("/");
+      final fileName = parts.last;
+      final parentPath =
+          parts.length > 1 ? parts.sublist(0, parts.length - 1).join("/") : null;
+      final parentId = parentPath != null ? dirNodeIds[parentPath] : null;
+
+      final node = FileNode(
+        id: EntityId(const Uuid().v4()),
+        projectId: projectId,
+        parentId: parentId,
+        name: fileName,
+        type: FileNodeType.file,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await workspace.createNode(node);
+      await contents.writeFile(projectId, node.id, entry.value);
+    }
   }
 
   Future<void> _createProjectDialog() async {
