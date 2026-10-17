@@ -86,9 +86,14 @@ class _FakeContentRepo implements FileContentRepository {
 
   @override
   Future<void> deleteContent(
-      EntityId projectId, EntityId fileNodeId) async {}
+      EntityId projectId, EntityId fileNodeId) async {
+    _files.remove(fileNodeId.value);
+  }
+
   @override
-  Future<void> deleteAllContentForProject(EntityId projectId) async {}
+  Future<void> deleteAllContentForProject(EntityId projectId) async {
+    _files.clear();
+  }
 }
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -161,7 +166,7 @@ void main() {
     });
     tearDown(() => ctrl.dispose());
 
-    test('help lists all 9 commands', () async {
+    test('help lists all 11 commands', () async {
       await ctrl.executeCommand('help');
       final out = ctrl.outputLines.join('\n');
       for (final cmd in CommandDispatcher.supportedCommands) {
@@ -451,7 +456,7 @@ void main() {
           const EntityId('f-readme'), utf8.encode('Hello World'));
       contentRepo.seed(const EntityId('f-main'), utf8.encode('void main() {}'));
       contentRepo.seed(const EntityId('f-style'), <int>[]);
-      ctrl = _makeController(_testNodes, contentRepo);
+      ctrl = _makeController(List<FileNode>.from(_testNodes), contentRepo);
       ctrl.setActiveProject(_makeProject());
     });
     tearDown(() => ctrl.dispose());
@@ -513,6 +518,162 @@ void main() {
   });
 
   // â”€â”€ Output limits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+  // ── rm ────────────────────────────────────────────────────────────────
+
+  group('rm', () {
+    late _FakeContentRepo contentRepo;
+    late TerminalController ctrl;
+
+    setUp(() {
+      contentRepo = _FakeContentRepo();
+      contentRepo.seed(
+          const EntityId('f-readme'), utf8.encode('Hello World'));
+      contentRepo.seed(
+          const EntityId('f-main'), utf8.encode('void main() {}'));
+      ctrl = _makeController(_testNodes, contentRepo);
+      ctrl.setActiveProject(_makeProject());
+    });
+    tearDown(() => ctrl.dispose());
+
+    test('rm removes an existing file', () async {
+      await ctrl.executeCommand('rm README.md');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('Removed: README.md')),
+          isTrue);
+    });
+
+    test('rm file no longer in ls', () async {
+      await ctrl.executeCommand('rm README.md');
+      await ctrl.executeCommand('clear');
+      await ctrl.executeCommand('ls');
+      final out = ctrl.outputLines.join('\n');
+      expect(out, isNot(contains('README.md')));
+    });
+
+    test('rm content no longer accessible', () async {
+      await ctrl.executeCommand('rm README.md');
+      await ctrl.executeCommand('clear');
+      await ctrl.executeCommand('cat README.md');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('No such file')),
+          isTrue);
+    });
+
+    test('rm missing file errors', () async {
+      await ctrl.executeCommand('rm ghost.txt');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('No such file')), isTrue);
+    });
+
+    test('rm directory rejected', () async {
+      await ctrl.executeCommand('rm src');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('is a directory')), isTrue);
+    });
+
+    test('rm invalid name rejected', () async {
+      await ctrl.executeCommand('rm a/b');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('Invalid')), isTrue);
+    });
+
+    test('rm missing name shows usage', () async {
+      await ctrl.executeCommand('rm');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('Usage:')), isTrue);
+    });
+
+    test('rm no project', () async {
+      final c = _makeController();
+      await c.executeCommand('rm x.txt');
+      expect(
+          c.outputLines.any((l) => l.contains('No active project')), isTrue);
+      c.dispose();
+    });
+  });
+
+  // ── rmdir ─────────────────────────────────────────────────────────────
+
+  group('rmdir', () {
+    late TerminalController ctrl;
+
+    setUp(() {
+      ctrl = _makeController(List<FileNode>.from(_testNodes));
+      ctrl.setActiveProject(_makeProject());
+    });
+    tearDown(() => ctrl.dispose());
+
+    test('rmdir removes empty directory', () async {
+      await ctrl.executeCommand('mkdir empty_dir');
+      await ctrl.executeCommand('rmdir empty_dir');
+      expect(
+          ctrl.outputLines.any(
+              (l) => l.contains('Removed directory: empty_dir/')),
+          isTrue);
+    });
+
+    test('rmdir removed dir no longer in ls', () async {
+      await ctrl.executeCommand('mkdir temp_dir');
+      await ctrl.executeCommand('rmdir temp_dir');
+      await ctrl.executeCommand('clear');
+      await ctrl.executeCommand('ls');
+      final out = ctrl.outputLines.join('\n');
+      expect(out, isNot(contains('temp_dir')));
+    });
+
+    test('rmdir missing directory errors', () async {
+      await ctrl.executeCommand('rmdir ghost');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('No such directory')),
+          isTrue);
+    });
+
+    test('rmdir file rejected', () async {
+      await ctrl.executeCommand('touch testfile.txt');
+      await ctrl.executeCommand('clear');
+      await ctrl.executeCommand('rmdir testfile.txt');
+      expect(
+          ctrl.outputLines.any(
+              (l) => l.contains('is a file, not a directory')),
+          isTrue);
+    });
+
+    test('rmdir non-empty directory rejected', () async {
+      await ctrl.executeCommand('rmdir src');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('is not empty')), isTrue);
+    });
+
+    test('rmdir non-empty contents preserved', () async {
+      await ctrl.executeCommand('rmdir src');
+      await ctrl.executeCommand('cd src');
+      await ctrl.executeCommand('ls');
+      final out = ctrl.outputLines.join('\n');
+      expect(out, contains('main.dart'));
+    });
+
+    test('rmdir invalid name rejected', () async {
+      await ctrl.executeCommand('rmdir a/b');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('Invalid')), isTrue);
+    });
+
+    test('rmdir missing name shows usage', () async {
+      await ctrl.executeCommand('rmdir');
+      expect(
+          ctrl.outputLines.any((l) => l.contains('Usage:')), isTrue);
+    });
+
+    test('rmdir no project', () async {
+      final c = _makeController();
+      await c.executeCommand('rmdir x');
+      expect(
+          c.outputLines.any((l) => l.contains('No active project')), isTrue);
+      c.dispose();
+    });
+  });
 
   group('output limits', () {
     test('line limit enforced', () {
