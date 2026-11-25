@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
+import '../android_build/android_build_controller.dart';
 import '../editor/code_accessory_bar.dart';
 import '../editor/code_editing_controller.dart';
 import '../editor/contextual_code_panel.dart';
@@ -13,6 +14,10 @@ class EditorView extends StatefulWidget {
   final VoidCallback? onPreview;
   final VoidCallback? onSaveCompleted;
   final bool isPreviewActive;
+  final ProjectType? projectType;
+  final AndroidBuildController? buildController;
+  final VoidCallback? onBuild;
+  final VoidCallback? onDiagnostics;
 
   const EditorView({
     super.key,
@@ -22,6 +27,10 @@ class EditorView extends StatefulWidget {
     this.onPreview,
     this.onSaveCompleted,
     this.isPreviewActive = false,
+    this.projectType,
+    this.buildController,
+    this.onBuild,
+    this.onDiagnostics,
   });
 
   @override
@@ -59,7 +68,6 @@ class _EditorViewState extends State<EditorView> {
       _controller.dispose();
       _controller = CodeEditingController(language: _language);
       _controller.addListener(_onControllerChanged);
-      _isPanelExpanded = false;
       _loadContent();
     }
   }
@@ -73,11 +81,9 @@ class _EditorViewState extends State<EditorView> {
   }
 
   void _onControllerChanged() {
-    final dirty = _controller.text != _initialContent;
-    if (dirty != _isDirty) {
-      setState(() {
-        _isDirty = dirty;
-      });
+    final isDirty = _controller.text != _initialContent;
+    if (isDirty != _isDirty) {
+      setState(() => _isDirty = isDirty);
     }
   }
 
@@ -104,65 +110,47 @@ class _EditorViewState extends State<EditorView> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load file content: $e';
+          _errorMessage = e.toString();
         });
       }
     }
   }
 
   Future<void> _saveContent() async {
-    if (_isSaving) return;
+    if (_isSaving || !_isDirty) return;
 
-    setState(() {
-      _isSaving = true;
-    });
-
+    setState(() => _isSaving = true);
     try {
-      final textToSave = _controller.text;
       await widget.contentRepository.writeFile(
         widget.fileNode.projectId,
         widget.fileNode.id,
-        textToSave,
+        _controller.text,
       );
-
       if (mounted) {
-        _initialContent = textToSave;
+        _initialContent = _controller.text;
         setState(() {
           _isSaving = false;
           _isDirty = false;
         });
-
+        widget.onSaveCompleted?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Saved "${widget.fileNode.name}"'),
             duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
           ),
         );
-
-        // Notify parent that save has completed
-        widget.onSaveCompleted?.call();
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Save failed: $e'),
+            content: Text('Failed to save: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 4),
           ),
         );
       }
     }
-  }
-
-  void _togglePanel() {
-    setState(() {
-      _isPanelExpanded = !_isPanelExpanded;
-    });
   }
 
   IconData _getLanguageIcon() {
@@ -173,14 +161,21 @@ class _EditorViewState extends State<EditorView> {
         return Icons.css;
       case SourceLanguage.javascript:
         return Icons.javascript;
-      case SourceLanguage.plainText:
+      case SourceLanguage.kotlin:
+        return Icons.android;
+      case SourceLanguage.gradle:
+        return Icons.build_circle_outlined;
+      case SourceLanguage.xml:
         return Icons.code;
+      default:
+        return Icons.description_outlined;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = '${widget.fileNode.name}${_isDirty ? ' *' : ''}';
+    final isAndroid = widget.projectType == ProjectType.android;
+    final title = _isDirty ? '${widget.fileNode.name} *' : widget.fileNode.name;
 
     return CallbackShortcuts(
       bindings: {
@@ -237,7 +232,48 @@ class _EditorViewState extends State<EditorView> {
               ],
             ),
             actions: [
-              if (widget.onPreview != null)
+              if (isAndroid && widget.buildController != null)
+                ListenableBuilder(
+                  listenable: widget.buildController!,
+                  builder: (ctx, _) {
+                    final controller = widget.buildController!;
+                    final isBusy = controller.isBusy;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isBusy)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ),
+                          )
+                        else
+                          IconButton(
+                            key: const Key('editor_build_apk_button'),
+                            tooltip: 'Build APK (Gradle)',
+                            icon: const Icon(Icons.build_circle_outlined, color: Colors.green),
+                            onPressed: widget.onBuild,
+                          ),
+                        if (controller.lastResult != null)
+                          IconButton(
+                            key: const Key('editor_build_diagnostics_button'),
+                            tooltip: 'Build Diagnostics',
+                            icon: Icon(
+                              controller.lastResult!.isSuccess
+                                  ? Icons.assignment_turned_in_outlined
+                                  : Icons.assignment_late_outlined,
+                              color: controller.lastResult!.isSuccess ? Colors.green : Colors.red,
+                            ),
+                            onPressed: widget.onDiagnostics,
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              if (widget.onPreview != null && !isAndroid)
                 IconButton(
                   key: const Key('editor_preview_button'),
                   icon: Icon(widget.isPreviewActive
@@ -274,11 +310,14 @@ class _EditorViewState extends State<EditorView> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline,
-                                size: 48,
-                                color: Theme.of(context).colorScheme.error),
-                            const SizedBox(height: 12),
-                            Text(_errorMessage!, textAlign: TextAlign.center),
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load file:\n$_errorMessage',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.red),
+                            ),
                             const SizedBox(height: 16),
                             FilledButton(
                               onPressed: _loadContent,
@@ -288,71 +327,50 @@ class _EditorViewState extends State<EditorView> {
                         ),
                       ),
                     )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final availableHeight = constraints.maxHeight;
-
-                        // ── Adaptive Layout Calculations ──
-                        // If vertical space is extremely short (e.g., keyboard open on phone landscape),
-                        // temporarily hide the contextual panel so the text editor has enough room to be usable.
-                        final shouldShowPanel =
-                            _isPanelExpanded && availableHeight >= 180.0;
-
-                        // Dynamically scale panel height to at most 45% of available space, clamped safely between 80px and 220px.
-                        final dynamicMaxHeight =
-                            (availableHeight * 0.45).clamp(80.0, 220.0);
-
-                        return Column(
-                          children: [
-                            // Main text editing field
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: TextField(
-                                  key: const Key('editor_text_field'),
-                                  controller: _controller,
-                                  focusNode: _focusNode,
-                                  maxLines: null,
-                                  expands: true,
-                                  keyboardType: TextInputType.multiline,
-                                  autofocus: true,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 14.0,
-                                    height: 1.4,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: 'Type your code here...',
-                                  ),
-                                ),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            key: const Key('editor_text_field'),
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            maxLines: null,
+                            expands: true,
+                            keyboardType: TextInputType.multiline,
+                            textAlignVertical: TextAlignVertical.top,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.all(16.0),
+                            ),
+                          ),
+                        ),
+                        if (_isPanelExpanded)
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: SingleChildScrollView(
+                              child: ContextualCodePanel(
+                                language: _language,
+                                controller: _controller,
+                                focusNode: _focusNode,
+                                onClose: () =>
+                                    setState(() => _isPanelExpanded = false),
                               ),
                             ),
-
-                            // Expandable Contextual Panel
-                            if (shouldShowPanel)
-                              Flexible(
-                                child: ContextualCodePanel(
-                                  controller: _controller,
-                                  focusNode: _focusNode,
-                                  language: _language,
-                                  maxHeight: dynamicMaxHeight,
-                                  onClose: () =>
-                                      setState(() => _isPanelExpanded = false),
-                                ),
-                              ),
-
-                            // Compact Coding Accessory Bar
-                            CodeAccessoryBar(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              language: _language,
-                              isPanelExpanded: _isPanelExpanded,
-                              onTogglePanel: _togglePanel,
-                            ),
-                          ],
-                        );
-                      },
+                          ),
+                        CodeAccessoryBar(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          language: _language,
+                          isPanelExpanded: _isPanelExpanded,
+                          onTogglePanel: () => setState(
+                              () => _isPanelExpanded = !_isPanelExpanded),
+                        ),
+                      ],
                     ),
         ),
       ),
