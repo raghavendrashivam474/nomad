@@ -4,6 +4,8 @@ import 'artifact_manager.dart';
 import 'android_build_service.dart';
 import 'build_error_classifier.dart';
 import 'build_result.dart';
+import 'providers/build_provider.dart';
+import 'providers/local_host_build_provider.dart';
 
 enum BuildPhase {
   idle,
@@ -18,8 +20,9 @@ enum BuildPhase {
 
 /// State notifier coordinating build execution, concurrency guards, and diagnostics.
 class AndroidBuildController extends ChangeNotifier {
-  final AndroidBuildService buildService;
+  final BuildProvider provider;
   final ArtifactManager artifactManager;
+  final AndroidBuildService? buildService;
 
   BuildPhase _phase = BuildPhase.idle;
   EntityId? _activeProjectId;
@@ -29,9 +32,16 @@ class AndroidBuildController extends ChangeNotifier {
   String _statusMessage = 'Idle';
 
   AndroidBuildController({
-    required this.buildService,
+    BuildProvider? provider,
+    AndroidBuildService? buildService,
     ArtifactManager? artifactManager,
-  }) : artifactManager = artifactManager ?? buildService.artifactManager;
+  })  : buildService = buildService,
+        provider = provider ??
+            (buildService != null
+                ? LocalHostBuildProvider(buildService: buildService)
+                : throw ArgumentError('Either provider or buildService must be supplied to AndroidBuildController')),
+        artifactManager = artifactManager ??
+            (buildService != null ? buildService.artifactManager : ArtifactManager());
 
   BuildPhase get phase => _phase;
   EntityId? get activeProjectId => _activeProjectId;
@@ -39,6 +49,7 @@ class AndroidBuildController extends ChangeNotifier {
   ApkArtifact? get lastArtifact => _lastArtifact;
   ClassifiedError? get classifiedError => _classifiedError;
   String get statusMessage => _statusMessage;
+
   bool get isBusy =>
       _phase == BuildPhase.preparing ||
       _phase == BuildPhase.building ||
@@ -53,7 +64,7 @@ class AndroidBuildController extends ChangeNotifier {
 
     _activeProjectId = projectId;
     _phase = BuildPhase.preparing;
-    _statusMessage = 'Materializing workspace files...';
+    _statusMessage = 'Negotiating build provider...';
     _lastResult = null;
     _lastArtifact = null;
     _classifiedError = null;
@@ -61,10 +72,10 @@ class AndroidBuildController extends ChangeNotifier {
 
     try {
       _phase = BuildPhase.building;
-      _statusMessage = 'Running Gradle assembleDebug...';
+      _statusMessage = 'Compiling Android APK...';
       notifyListeners();
 
-      final result = await buildService.build(projectId);
+      final result = await provider.build(BuildRequest(projectId: projectId));
       _lastResult = result;
 
       switch (result.status) {
@@ -75,6 +86,7 @@ class AndroidBuildController extends ChangeNotifier {
             _lastArtifact = await artifactManager.getLatestArtifact(projectId);
           }
           break;
+
         case BuildStatus.failure:
           _phase = BuildPhase.failure;
           _statusMessage = 'Build failed';
@@ -85,6 +97,7 @@ class AndroidBuildController extends ChangeNotifier {
             isCancelled: false,
           );
           break;
+
         case BuildStatus.timeout:
           _phase = BuildPhase.timeout;
           _statusMessage = 'Build timed out';
@@ -95,6 +108,7 @@ class AndroidBuildController extends ChangeNotifier {
             isCancelled: false,
           );
           break;
+
         case BuildStatus.cancelled:
           _phase = BuildPhase.cancelled;
           _statusMessage = 'Build cancelled';
@@ -136,7 +150,7 @@ class AndroidBuildController extends ChangeNotifier {
       _phase = BuildPhase.cancelling;
       _statusMessage = 'Cancelling build...';
       notifyListeners();
-      buildService.cancel();
+      provider.cancel();
     }
   }
 

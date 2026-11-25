@@ -1,6 +1,49 @@
-﻿import 'package:nomad_core/nomad_core.dart';
+﻿import 'dart:io';
+import 'package:nomad_core/nomad_core.dart';
 import '../build_result.dart';
 import 'build_provider.dart';
+
+/// Fallback provider invoked when no registered provider is currently available.
+class UnavailableFallbackProvider implements BuildProvider {
+  final List<BuildCapabilities> probedCapabilities;
+
+  const UnavailableFallbackProvider({required this.probedCapabilities});
+
+  @override
+  Future<BuildCapabilities> getCapabilities() async {
+    return const BuildCapabilities(
+      providerType: BuildProviderType.onDeviceCompanion,
+      providerName: 'No Available Provider',
+      isAvailable: false,
+      unavailableReason: 'No registered build provider is currently available.',
+    );
+  }
+
+  @override
+  Future<BuildResult> build(BuildRequest request) async {
+    final isMobile = Platform.isAndroid || Platform.isIOS;
+    final msg = isMobile
+        ? 'No on-device build provider available.\n\n'
+          'The Nomad Companion Daemon was not detected on 127.0.0.1:8089.\n'
+          'To build APKs directly on your phone:\n'
+          '  1. Open Termux on this device\n'
+          '  2. Start the daemon: dart run experiments/android_lab_on_device/companion_agent/agent.dart\n'
+          '  3. Return to Nomad and press Build again.'
+        : 'No build provider available on this host. Ensure JDK 17/21 and Android SDK are configured.';
+
+    return BuildResult(
+      status: BuildStatus.failure,
+      log: msg,
+      duration: Duration.zero,
+      errorMessage: isMobile
+          ? 'On-device companion agent required: Start the Termux daemon on 127.0.0.1:8089 to build on phone.'
+          : 'Workstation build host required: Configure JDK and Android SDK or start the companion agent.',
+    );
+  }
+
+  @override
+  void cancel() {}
+}
 
 /// Coordinates multiple [BuildProvider] backends and automatically selects
 /// the best available provider based on runtime capabilities.
@@ -17,13 +60,15 @@ class BuildOrchestrator implements BuildProvider {
 
   /// Probes all registered providers in priority order and returns the first available one.
   Future<BuildProvider> selectOptimalProvider() async {
+    final probed = <BuildCapabilities>[];
     for (final provider in providers) {
       final caps = await provider.getCapabilities();
+      probed.add(caps);
       if (caps.isAvailable) {
         return provider;
       }
     }
-    return providers.first;
+    return UnavailableFallbackProvider(probedCapabilities: probed);
   }
 
   @override
@@ -37,9 +82,17 @@ class BuildOrchestrator implements BuildProvider {
     _isCancelled = false;
     final provider = await selectOptimalProvider();
     _activeProvider = provider;
+
     if (_isCancelled) {
       provider.cancel();
+      return const BuildResult(
+        status: BuildStatus.cancelled,
+        log: '',
+        duration: Duration.zero,
+        errorMessage: 'Build cancelled by user before execution',
+      );
     }
+
     try {
       return await provider.build(request);
     } finally {

@@ -3,6 +3,9 @@ import 'package:nomad_core/nomad_core.dart';
 import '../activity/activity_controller.dart';
 import '../android_build/adb_service.dart';
 import '../android_build/android_build_controller.dart';
+import '../android_build/providers/build_orchestrator.dart';
+import '../android_build/providers/local_host_build_provider.dart';
+import '../android_build/providers/companion_build_provider.dart';
 import '../android_build/android_build_service.dart';
 import '../android_build/artifact_manager.dart';
 import '../android_build/project_materializer.dart';
@@ -160,13 +163,26 @@ class _AppShellState extends State<AppShell> {
         workspace: widget.workspaceRepository,
         content: widget.contentRepository,
       );
+      final artifactManager = ArtifactManager();
       final buildService = AndroidBuildService(
         materializer: materializer,
         hostAndroidDir: 'android',
+        artifactManager: artifactManager,
+      );
+      final orchestrator = BuildOrchestrator(
+        providers: [
+          LocalHostBuildProvider(buildService: buildService),
+          CompanionBuildProvider(
+            workspaceRepository: widget.workspaceRepository,
+            contentRepository: widget.contentRepository,
+            artifactManager: artifactManager,
+          ),
+        ],
       );
       _buildController = AndroidBuildController(
+        provider: orchestrator,
+        artifactManager: artifactManager,
         buildService: buildService,
-        artifactManager: ArtifactManager(),
       );
     }
     setState(() {
@@ -830,3 +846,4 @@ class _TabletLayout extends StatelessWidget {
     );
   }
 }
+
