@@ -1,9 +1,12 @@
-/// Represents supported programming/markup languages recognized by Nomad.
+﻿/// Represents supported programming/markup languages recognized by Nomad.
 enum SourceLanguage {
   html('HTML', ['html', 'htm']),
   css('CSS', ['css']),
   javascript('JavaScript', ['js', 'mjs', 'cjs']),
-  plainText('Plain Text', ['txt', 'md']);
+  kotlin('Kotlin', ['kt', 'kts']),
+  xml('XML', ['xml']),
+  gradle('Gradle', ['gradle']),
+  plainText('Plain Text', ['txt', 'md', 'properties']);
 
   final String displayName;
   final List<String> extensions;

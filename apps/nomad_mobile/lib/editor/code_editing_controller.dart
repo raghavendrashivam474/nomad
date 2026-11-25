@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'source_language.dart';
 
 /// A lightweight, dependency-free syntax-highlighting TextEditingController.
@@ -31,6 +31,10 @@ class CodeEditingController extends TextEditingController {
         return _buildCssSpans(textVal, style, isDark);
       case SourceLanguage.javascript:
         return _buildJsSpans(textVal, style, isDark);
+      case SourceLanguage.xml:
+        return _buildHtmlSpans(textVal, style, isDark);
+      case SourceLanguage.kotlin:
+      case SourceLanguage.gradle:
       case SourceLanguage.plainText:
         return TextSpan(text: textVal, style: style);
     }
