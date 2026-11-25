@@ -21,7 +21,7 @@ task testTask {
     await File('${tempDir.path}/settings.gradle').writeAsString(settingsGradle);
     
     print('Executing Gradle task in: ${tempDir.path}');
-    final gradleCmd = Platform.isWindows ? 'gradle.bat' : 'gradle';
+    // gradle invocation
     
     // Check if gradle is directly on path or gradlew
     final res = await Process.run(
@@ -50,3 +50,4 @@ task testTask {
     }
   }
 }
+

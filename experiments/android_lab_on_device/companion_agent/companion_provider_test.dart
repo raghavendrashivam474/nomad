@@ -5,8 +5,8 @@ void main() async {
   print('=== POC-06: Companion Agent Client & Protocol Verification ===');
   
   // Start the companion agent in-process for verification
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 8099);
-  print('Test Companion Server listening on port 8099');
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 8089);
+  print('Test Companion Server listening on port 8089');
   
   server.listen((req) async {
     if (req.uri.path == '/api/v1/capabilities') {
@@ -37,7 +37,7 @@ void main() async {
   try {
     // 1. Probe capabilities
     print('Probing /api/v1/capabilities...');
-    final reqCap = await client.getUrl(Uri.parse('http://127.0.0.1:8099/api/v1/capabilities'));
+    final reqCap = await client.getUrl(Uri.parse('http://127.0.0.1:8089/api/v1/capabilities'));
     final resCap = await reqCap.close();
     final capBody = await utf8.decodeStream(resCap);
     print('Capabilities Response: $capBody');
@@ -45,7 +45,7 @@ void main() async {
 
     // 2. Submit build request
     print('Submitting BuildRequest with files payload...');
-    final reqBuild = await client.postUrl(Uri.parse('http://127.0.0.1:8099/api/v1/builds'));
+    final reqBuild = await client.postUrl(Uri.parse('http://127.0.0.1:8089/api/v1/builds'));
     reqBuild.headers.contentType = ContentType.json;
     final payload = jsonEncode({
       'projectId': 'test_proj_al2',
@@ -69,3 +69,4 @@ void main() async {
     await server.close(force: true);
   }
 }
+
