@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'code_input_actions.dart';
 import 'source_language.dart';
 
@@ -201,6 +201,30 @@ class ContextualCodePanel extends StatelessWidget {
           _buildSnippetChip('// comment', '// ', 3),
         ];
 
+      case SourceLanguage.kotlin:
+        return [
+          _buildSnippetChip('@Composable', '@Composable\nfun MyComposable() {\n  \n}', 37),
+          _buildSnippetChip('fun', 'fun functionName() {\n  \n}', 17),
+          _buildSnippetChip('remember', 'var count by remember { mutableStateOf(0) }', 43),
+          _buildSnippetChip('Column', 'Column(modifier = Modifier.fillMaxWidth()) {\n  \n}', 48),
+          _buildSnippetChip('Row', 'Row(modifier = Modifier.fillMaxWidth()) {\n  \n}', 45),
+          _buildSnippetChip('Text()', 'Text(text = "Hello Nomad")', 24),
+          _buildSnippetChip('Button()', 'Button(onClick = { }) {\n  Text("Click")\n}', 38),
+          _buildSnippetChip('// comment', '// ', 3),
+        ];
+      case SourceLanguage.gradle:
+        return [
+          _buildSnippetChip('plugins {}', 'plugins {\n  \n}', 11),
+          _buildSnippetChip('dependencies {}', 'dependencies {\n  \n}', 16),
+          _buildSnippetChip('implementation()', 'implementation("...")', 16),
+          _buildSnippetChip('// comment', '// ', 3),
+        ];
+      case SourceLanguage.xml:
+        return [
+          _buildSnippetChip('<manifest>', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n  \n</manifest>', 73),
+          _buildSnippetChip('<activity>', '<activity android:name=".MainActivity" />', 41),
+          _buildSnippetChip('<!-- comment -->', '<!--  -->', 5),
+        ];
       case SourceLanguage.plainText:
         return [
           _buildSnippetChip('Tab', '  ', 2),
