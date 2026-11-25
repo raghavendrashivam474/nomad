@@ -1,22 +1,34 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:uuid/uuid.dart';
+import '../android_build/adb_service.dart';
+import '../android_build/android_build_controller.dart';
+import '../android_build/android_build_service.dart';
+import '../android_build/artifact_manager.dart';
+import '../android_build/project_materializer.dart';
 import '../branding/nomad_brand.dart';
+import 'android/build_diagnostics_sheet.dart';
 
 class WorkspaceView extends StatefulWidget {
   final Project project;
   final WorkspaceRepository workspaceRepository;
+  final FileContentRepository? contentRepository;
   final EntityId? selectedNodeId;
   final ValueChanged<FileNode>? onFileSelected;
   final VoidCallback? onBack;
+  final AndroidBuildController? buildController;
+  final AdbService? adbService;
 
   const WorkspaceView({
     super.key,
     required this.project,
     required this.workspaceRepository,
+    this.contentRepository,
     this.selectedNodeId,
     this.onFileSelected,
     this.onBack,
+    this.buildController,
+    this.adbService,
   });
 
   @override
@@ -29,10 +41,36 @@ class _WorkspaceViewState extends State<WorkspaceView> {
   final List<FileNode> _folderBreadcrumbs = [];
   bool _isLoading = true;
 
+  AndroidBuildController? _internalBuildController;
+  AndroidBuildController get _buildController =>
+      widget.buildController ?? _internalBuildController!;
+
   @override
   void initState() {
     super.initState();
     _loadNodes();
+    if (widget.project.type == ProjectType.android && widget.buildController == null) {
+      if (widget.contentRepository != null) {
+        final materializer = ProjectMaterializer(
+          workspace: widget.workspaceRepository,
+          content: widget.contentRepository!,
+        );
+        final buildService = AndroidBuildService(
+          materializer: materializer,
+          hostAndroidDir: 'android',
+        );
+        _internalBuildController = AndroidBuildController(
+          buildService: buildService,
+          artifactManager: ArtifactManager(),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _internalBuildController?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNodes() async {
@@ -67,6 +105,44 @@ class _WorkspaceViewState extends State<WorkspaceView> {
             _folderBreadcrumbs.isEmpty ? null : _folderBreadcrumbs.last.id;
       });
     }
+  }
+
+  Future<void> _triggerAndroidBuild() async {
+    final controller = _buildController;
+    if (controller.isBusy) return;
+
+    try {
+      final res = await controller.startBuild(widget.project.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.isSuccess ? 'APK build succeeded!' : 'APK build failed: ${res.errorMessage ?? "Check diagnostics"}'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Diagnostics',
+              onPressed: () => _openDiagnosticsSheet(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Build error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openDiagnosticsSheet() {
+    BuildDiagnosticsSheet.show(
+      context,
+      buildController: _buildController,
+      adbService: widget.adbService,
+    );
   }
 
   Future<void> _showCreateDialog(FileNodeType type) async {
@@ -181,7 +257,6 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     );
   }
 
-  /// Calculates all descendant folder IDs of a given folder.
   Set<EntityId> _getDescendantFolderIds(EntityId folderId) {
     final descendants = <EntityId>{};
     final queue = <EntityId>[folderId];
@@ -197,11 +272,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         }
       }
     }
-
     return descendants;
   }
 
-  /// Displays the destination picker dialog for moving a file or folder.
   Future<void> _showMoveDialog(FileNode node) async {
     final invalidTargets = <EntityId?>{node.parentId};
     if (node.isFolder) {
@@ -209,7 +282,6 @@ class _WorkspaceViewState extends State<WorkspaceView> {
       invalidTargets.addAll(_getDescendantFolderIds(node.id));
     }
 
-    // Available target folders: Root + all non-invalid folders
     final targetFolders = _allNodes
         .where((n) => n.isFolder && !invalidTargets.contains(n.id))
         .toList();
@@ -243,7 +315,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                                                    RadioGroup<EntityId?>(
+                          RadioGroup<EntityId?>(
                             groupValue: selectedTargetId,
                             onChanged: (val) =>
                                 setDialogState(() => selectedTargetId = val),
@@ -362,6 +434,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
   @override
   Widget build(BuildContext context) {
     final currentNodes = _currentLevelNodes;
+    final isAndroidProject = widget.project.type == ProjectType.android;
 
     return Scaffold(
       appBar: AppBar(
@@ -381,6 +454,47 @@ class _WorkspaceViewState extends State<WorkspaceView> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (isAndroidProject && (widget.buildController != null || _internalBuildController != null))
+            ListenableBuilder(
+              listenable: _buildController,
+              builder: (ctx, _) {
+                final controller = _buildController;
+                final isBusy = controller.isBusy;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isBusy)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        key: const Key('build_apk_button'),
+                        tooltip: 'Build APK',
+                        icon: const Icon(Icons.build_circle_outlined),
+                        onPressed: _triggerAndroidBuild,
+                      ),
+                    if (controller.lastResult != null)
+                      IconButton(
+                        key: const Key('build_diagnostics_button'),
+                        tooltip: 'Build Diagnostics',
+                        icon: Icon(
+                          controller.lastResult!.isSuccess
+                              ? Icons.assignment_turned_in_outlined
+                              : Icons.assignment_late_outlined,
+                          color: controller.lastResult!.isSuccess ? Colors.green : Colors.red,
+                        ),
+                        onPressed: _openDiagnosticsSheet,
+                      ),
+                  ],
+                );
+              },
+            ),
           IconButton(
             key: const Key('add_folder_button'),
             tooltip: 'New Folder',
@@ -449,7 +563,6 @@ class _WorkspaceViewState extends State<WorkspaceView> {
                           itemBuilder: (context, index) {
                             final node = currentNodes[index];
                             final isSelected = widget.selectedNodeId == node.id;
-
                             return ListTile(
                               key: Key('node_${node.name}'),
                               selected: isSelected,
