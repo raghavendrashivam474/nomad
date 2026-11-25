@@ -1,8 +1,14 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../activity/activity_controller.dart';
+import '../android_build/adb_service.dart';
+import '../android_build/android_build_controller.dart';
+import '../android_build/android_build_service.dart';
+import '../android_build/artifact_manager.dart';
+import '../android_build/project_materializer.dart';
 import '../branding/nomad_brand.dart';
 import '../branding/nomad_logo_widget.dart';
+import '../ui/android/build_diagnostics_sheet.dart';
 import '../ui/editor_view.dart';
 import '../ui/projects_view.dart';
 import '../ui/workspace_view.dart';
@@ -43,6 +49,8 @@ class _AppShellState extends State<AppShell> {
 
   final ActivityController _activityController = ActivityController();
   late final TerminalController _terminalController;
+  AndroidBuildController? _buildController;
+  final AdbService _adbService = AdbService();
 
   @override
   void initState() {
@@ -55,6 +63,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _buildController?.dispose();
     _terminalController.dispose();
     _activityController.dispose();
     super.dispose();
@@ -88,6 +97,8 @@ class _AppShellState extends State<AppShell> {
 
   void _onProjectDeselected() {
     _activityController.clear();
+    _buildController?.dispose();
+    _buildController = null;
     _terminalController.setActiveProject(null);
     setState(() {
       _selectedProject = null;
@@ -111,7 +122,6 @@ class _AppShellState extends State<AppShell> {
       DragUpdateDetails details, double maxAvailableWidth) {
     final maxAllowedWidth = (maxAvailableWidth * kMaxExplorerFraction)
         .clamp(kMinExplorerWidth, maxAvailableWidth - kMinEditorWidth);
-
     setState(() {
       _explorerWidth = (_explorerWidth + details.delta.dx)
           .clamp(kMinExplorerWidth, maxAllowedWidth);
@@ -124,15 +134,13 @@ class _AppShellState extends State<AppShell> {
     try {
       final nodes = await widget.workspaceRepository
           .getNodesForProject(_selectedProject!.id);
-
       final filename = sourceUri
-              .split('/')
+              .split(RegExp(r'[/\\]'))
               .where((s) => s.isNotEmpty)
               .lastOrNull ??
           sourceUri;
       final targetNode =
           nodes.where((n) => n.isFile && n.name == filename).firstOrNull;
-
       if (targetNode != null) {
         setState(() {
           _onFileSelected(targetNode);
@@ -145,10 +153,65 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _selectProject(Project project) {
+    _buildController?.dispose();
+    _buildController = null;
+    if (project.type == ProjectType.android) {
+      final materializer = ProjectMaterializer(
+        workspace: widget.workspaceRepository,
+        content: widget.contentRepository,
+      );
+      final buildService = AndroidBuildService(
+        materializer: materializer,
+        hostAndroidDir: 'android',
+      );
+      _buildController = AndroidBuildController(
+        buildService: buildService,
+        artifactManager: ArtifactManager(),
+      );
+    }
     setState(() {
       _selectedProject = project;
       _terminalController.setActiveProject(project);
     });
+  }
+
+  Future<void> _triggerAndroidBuild() async {
+    if (_selectedProject == null || _buildController == null) return;
+    try {
+      final res = await _buildController!.startBuild(_selectedProject!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.isSuccess
+                ? 'APK build succeeded!'
+                : 'APK build failed: ${res.errorMessage ?? "Check diagnostics"}'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Diagnostics',
+              onPressed: _openDiagnosticsSheet,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Build error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openDiagnosticsSheet() {
+    if (_buildController == null) return;
+    BuildDiagnosticsSheet.show(
+      context,
+      buildController: _buildController!,
+      adbService: _adbService,
+    );
   }
 
   @override
@@ -175,6 +238,10 @@ class _AppShellState extends State<AppShell> {
             key: ValueKey(_activeFileNode!.id.value),
             fileNode: _activeFileNode!,
             contentRepository: widget.contentRepository,
+            projectType: _selectedProject?.type,
+            buildController: _buildController,
+            onBuild: _triggerAndroidBuild,
+            onDiagnostics: _openDiagnosticsSheet,
             onClose: _closeEditor,
             onPreview: () => setState(() => _showPreview = true),
             isPreviewActive: _showPreview,
@@ -276,6 +343,10 @@ class _AppShellState extends State<AppShell> {
                                         project: _selectedProject!,
                                         workspaceRepository:
                                             widget.workspaceRepository,
+                                        contentRepository:
+                                            widget.contentRepository,
+                                        buildController: _buildController,
+                                        adbService: _adbService,
                                         selectedNodeId: _activeFileNode?.id,
                                         onFileSelected: _onFileSelected,
                                         onBack: _onProjectDeselected,
@@ -408,6 +479,15 @@ class _AppShellState extends State<AppShell> {
                                                           contentRepository:
                                                               widget
                                                                   .contentRepository,
+                                                          projectType:
+                                                              _selectedProject
+                                                                  ?.type,
+                                                          buildController:
+                                                              _buildController,
+                                                          onBuild:
+                                                              _triggerAndroidBuild,
+                                                          onDiagnostics:
+                                                              _openDiagnosticsSheet,
                                                           onClose:
                                                               _closeEditor,
                                                           onPreview: () =>
@@ -499,6 +579,9 @@ class _AppShellState extends State<AppShell> {
                       : WorkspaceView(
                           project: _selectedProject!,
                           workspaceRepository: widget.workspaceRepository,
+                          contentRepository: widget.contentRepository,
+                          buildController: _buildController,
+                          adbService: _adbService,
                           selectedNodeId: _activeFileNode?.id,
                           onFileSelected: _onFileSelected,
                           onBack: _onProjectDeselected,
@@ -638,53 +721,6 @@ class _ResizableDivider extends StatelessWidget {
   }
 }
 
-class _PhoneHomeLayout extends StatelessWidget {
-  final VoidCallback onOpenProjects;
-
-  const _PhoneHomeLayout({required this.onOpenProjects});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(NomadBrand.space24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const NomadLogo(size: 96, showBorder: true),
-              const SizedBox(height: NomadBrand.space24),
-              Text(
-                NomadBrand.productName,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-              ),
-              const SizedBox(height: NomadBrand.space8),
-              Text(
-                NomadBrand.subTagline,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: NomadBrand.space32),
-              FilledButton.icon(
-                key: const Key('get_started_button'),
-                onPressed: onOpenProjects,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Get Started'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _TabletLayout extends StatelessWidget {
   final TerminalController terminalController;
   final int selectedIndex;
@@ -778,8 +814,7 @@ class _TabletLayout extends StatelessWidget {
                       ),
                       const Divider(height: 1),
                       Expanded(
-                        child: TerminalView(
-                            controller: terminalController),
+                        child: TerminalView(controller: terminalController),
                       ),
                     ],
                   )
