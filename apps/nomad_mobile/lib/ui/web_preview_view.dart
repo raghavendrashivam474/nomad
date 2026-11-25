@@ -1,14 +1,15 @@
 ﻿/// Web Lab preview surface for Nomad.
 library;
-import '../server/nomad_transport_source.dart';
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:nomad_core/nomad_core.dart';
 import 'package:nomad_mobile/activity/activity_controller.dart';
 import 'package:nomad_mobile/activity/activity_event.dart';
 import 'package:nomad_mobile/ui/activity/live_activity_panel.dart';
+import '../server/nomad_transport_source.dart';
 import '../server/project_file_server.dart';
 import '../server/project_file_resolver.dart';
 
@@ -48,13 +49,13 @@ class WebPreviewView extends StatefulWidget {
 }
 
 class WebPreviewViewState extends State<WebPreviewView> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   ProjectFileServer? _server;
   bool _isLoading = true;
   String? _error;
 
   /// Expose the controller for test verification.
-  WebViewController get controller => _controller;
+  WebViewController get controller => _controller!;
 
   /// Expose the server instance for test verification.
   ProjectFileServer? get server => _server;
@@ -65,63 +66,70 @@ class WebPreviewViewState extends State<WebPreviewView> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0F172A))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (url) {
-            widget.activityController?.beginSession();
-            _reportActivity(
-              category: ActivityCategory.lifecycle,
-              severity: ActivitySeverity.info,
-              message: 'Preview loading...',
-              details: url,
-            );
-            if (mounted) setState(() => _isLoading = true);
+    if (!kIsWeb) {
+      _controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(const Color(0xFF0F172A))
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageStarted: (url) {
+              widget.activityController?.beginSession();
+              _reportActivity(
+                category: ActivityCategory.lifecycle,
+                severity: ActivitySeverity.info,
+                message: 'Preview loading...',
+                details: url,
+              );
+              if (mounted) setState(() => _isLoading = true);
+            },
+            onPageFinished: (url) {
+              // ADR-0010: Fallback Auto-Injection Guard
+              try {
+                _controller?.runJavaScript('''
+                  if (typeof window.NomadTransport === 'undefined') {
+                    ${NomadTransportSource.jsContent}
+                  }
+                ''').catchError((_) {});
+              } catch (_) {}
+              _reportActivity(
+                category: ActivityCategory.lifecycle,
+                severity: ActivitySeverity.info,
+                message: 'Preview ready',
+                details: url,
+              );
+              if (mounted) setState(() => _isLoading = false);
+            },
+            onWebResourceError: (err) {
+              debugPrint('WebView resource error: ${err.description}');
+              _reportActivity(
+                category: ActivityCategory.resource,
+                severity: err.isForMainFrame == true
+                    ? ActivitySeverity.error
+                    : ActivitySeverity.warning,
+                message: 'Resource error: ${err.description}',
+                details: 'URL: ${err.url ?? "unknown"}, '
+                    'type: ${err.errorType}, '
+                    'mainFrame: ${err.isForMainFrame}',
+              );
+            },
+          ),
+        )
+        ..addJavaScriptChannel(
+          'NomadDiag',
+          onMessageReceived: (JavaScriptMessage msg) {
+            _handleJavaScriptDiagnostic(msg.message);
           },
-                  onPageFinished: (url) {
-          // ADR-0010: Fallback Auto-Injection Guard
-          try { _controller.runJavaScript('''
-            if (typeof window.NomadTransport === 'undefined') {
-              ${NomadTransportSource.jsContent}
-            }
-          ''').catchError((_) {}); } catch (_) {}
-            _reportActivity(
-              category: ActivityCategory.lifecycle,
-              severity: ActivitySeverity.info,
-              message: 'Preview ready',
-              details: url,
-            );
-            if (mounted) setState(() => _isLoading = false);
-          },
-          onWebResourceError: (err) {
-            debugPrint('WebView resource error: ${err.description}');
-            _reportActivity(
-              category: ActivityCategory.resource,
-              severity: err.isForMainFrame == true
-                  ? ActivitySeverity.error
-                  : ActivitySeverity.warning,
-              message: 'Resource error: ${err.description}',
-              details: 'URL: ${err.url ?? "unknown"}, '
-                  'type: ${err.errorType}, '
-                  'mainFrame: ${err.isForMainFrame}',
-            );
-          },
-        ),
-      )
-      ..addJavaScriptChannel(
-        'NomadDiag',
-        onMessageReceived: (JavaScriptMessage msg) {
-          _handleJavaScriptDiagnostic(msg.message);
-        },
-      );
-    _startServerAndLoad();
+        );
+      _startServerAndLoad();
+    } else {
+      _isLoading = false;
+    }
   }
 
   @override
   void didUpdateWidget(covariant WebPreviewView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (kIsWeb) return;
     if (oldWidget.project.id != widget.project.id) {
       // Project changed — tear down old server, start fresh.
       _disposeServer();
@@ -137,21 +145,18 @@ class WebPreviewViewState extends State<WebPreviewView> {
   /// Full startup sequence: pre-check → start server → load URL.
   Future<void> _startServerAndLoad() async {
     final token = ++_loadToken;
-
     if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
-    // 1. Pre-check: verify index.html exists and is non-empty so we can
-    //    show a meaningful error instead of a raw 404 from the server.
+    // 1. Pre-check: verify index.html exists and is non-empty
     try {
       final fileNodes = await widget.workspaceRepository
           .getNodesForProject(widget.project.id);
       final indexNode =
           fileNodes.where((f) => f.isFile && f.name == _kIndexHtml).firstOrNull;
-
       if (indexNode == null) {
         if (mounted && token == _loadToken) {
           setState(() {
@@ -225,31 +230,29 @@ class WebPreviewViewState extends State<WebPreviewView> {
     }
 
     // 4. Load the project entry document over HTTP.
-    if (mounted && token == _loadToken) {
+    if (mounted && token == _loadToken && _controller != null) {
       final url = Uri.parse(
         'http://127.0.0.1:${_server!.boundPort}'
         '/${widget.project.id.value}/$_kIndexHtml',
       );
-      await _controller.loadRequest(url);
+      await _controller!.loadRequest(url);
     }
   }
 
   /// Reload the current document over the running server.
-  /// Falls back to a full restart if the server is not running.
   Future<void> _refreshPreview() async {
+    if (kIsWeb) return;
     if (_server == null || !_server!.isRunning) {
       await _startServerAndLoad();
       return;
     }
-
     if (!mounted) return;
     setState(() => _isLoading = true);
-
     final url = Uri.parse(
       'http://127.0.0.1:${_server!.boundPort}'
       '/${widget.project.id.value}/$_kIndexHtml',
     );
-    await _controller.loadRequest(url);
+    await _controller?.loadRequest(url);
   }
 
   /// Graceful async stop for use between restarts.
@@ -297,26 +300,20 @@ class WebPreviewViewState extends State<WebPreviewView> {
   }
 
   /// Parse and validate JavaScript error diagnostic messages.
-  /// Enforces schema and maximum size limits to protect architecture.
   void _handleJavaScriptDiagnostic(String rawJson) {
     if (rawJson.length > 4096) return;
-
     try {
       final decoded = jsonDecode(rawJson);
       if (decoded is! Map<String, dynamic>) return;
-
       final message = decoded['message'] as String?;
       if (message == null || message.trim().isEmpty) return;
-
       final level = decoded['level'] as String?;
       final severity =
           level == 'warn' ? ActivitySeverity.warning : ActivitySeverity.error;
-
       final details = decoded['details'] as String?;
       final source = decoded['source'] as String?;
       final line = decoded['line'] as int?;
       final column = decoded['column'] as int?;
-
       _reportActivity(
         category: ActivityCategory.runtime,
         severity: severity,
@@ -327,13 +324,12 @@ class WebPreviewViewState extends State<WebPreviewView> {
         column: column,
       );
     } catch (_) {
-      // Ignore malformed payloads to protect app stability
+      // Ignore malformed payloads
     }
   }
 
   void _showActivitySheet() {
     if (widget.activityController == null) return;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -358,6 +354,8 @@ class WebPreviewViewState extends State<WebPreviewView> {
 
   @override
   Widget build(BuildContext context) {
+    final isAndroid = widget.project.type == ProjectType.android;
+
     return Scaffold(
       appBar: AppBar(
         leading: widget.onClose != null
@@ -371,11 +369,11 @@ class WebPreviewViewState extends State<WebPreviewView> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.preview, size: 20),
+            Icon(isAndroid ? Icons.android : Icons.preview, size: 20),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Preview — ${widget.project.name}',
+                isAndroid ? 'Android Lab — ${widget.project.name}' : 'Preview — ${widget.project.name}',
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 16,
@@ -403,12 +401,13 @@ class WebPreviewViewState extends State<WebPreviewView> {
                 );
               },
             ),
-          IconButton(
-            key: const Key('preview_refresh_button'),
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Preview',
-            onPressed: _refreshPreview,
-          ),
+          if (!kIsWeb && !isAndroid)
+            IconButton(
+              key: const Key('preview_refresh_button'),
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh Preview',
+              onPressed: _refreshPreview,
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -417,13 +416,21 @@ class WebPreviewViewState extends State<WebPreviewView> {
   }
 
   Widget _buildBody() {
+    if (widget.project.type == ProjectType.android) {
+      return _buildAndroidLabPanel();
+    }
+
+    if (kIsWeb) {
+      return _buildWebPlatformNotice();
+    }
+
     if (_error != null) {
       return _buildErrorState();
     }
 
     return Stack(
       children: [
-        WebViewWidget(controller: _controller),
+        if (_controller != null) WebViewWidget(controller: _controller!),
         if (_isLoading)
           const Center(
             child: CircularProgressIndicator(),
@@ -432,10 +439,75 @@ class WebPreviewViewState extends State<WebPreviewView> {
     );
   }
 
+  Widget _buildAndroidLabPanel() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.android,
+              size: 64,
+              color: Colors.green.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Android Lab Native Project',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This project contains Kotlin 2.0.21 & Jetpack Compose source files.\nUse the Build APK action in the toolbar to compile a native Android APK with Gradle.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebPlatformNotice() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.web,
+              size: 56,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Web Lab Preview',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Embedded WebView preview is active on Android/iOS devices.\nOn Web, code editing, workspace management, and database persistence are fully enabled.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState() {
     final String message;
     final IconData icon;
-
     switch (_error) {
       case 'missing_entry':
         message = 'No index.html found in this project.\n'
@@ -494,4 +566,3 @@ class WebPreviewViewState extends State<WebPreviewView> {
     );
   }
 }
-
