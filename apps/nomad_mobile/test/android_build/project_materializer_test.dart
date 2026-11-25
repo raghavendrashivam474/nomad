@@ -19,18 +19,22 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<void> createNode(FileNode node) async {}
+
   @override
   Future<void> renameNode(EntityId id, String newName) async {}
+
   @override
   Future<void> moveNode(EntityId id, EntityId? newParentId) async {}
+
   @override
   Future<void> deleteNode(EntityId id) async {}
+
   @override
   Future<void> deleteAllNodesForProject(EntityId projectId) async {}
 }
 
 class FakeFileContentRepository extends FileContentRepository {
-  final Map<String, String> contents; // "projectId:nodeId" → content
+  final Map<String, String> contents; // "projectId:nodeId" -> content
   FakeFileContentRepository(this.contents);
 
   String _key(EntityId projectId, EntityId nodeId) =>
@@ -43,9 +47,11 @@ class FakeFileContentRepository extends FileContentRepository {
   @override
   Future<void> writeFile(
       EntityId projectId, EntityId fileNodeId, String content) async {}
+
   @override
   Future<void> deleteContent(
       EntityId projectId, EntityId fileNodeId) async {}
+
   @override
   Future<void> deleteAllContentForProject(EntityId projectId) async {}
 }
@@ -57,12 +63,12 @@ void main() {
     late String tempPath;
 
     setUp(() {
-      projectId = EntityId('test-project-1');
+      projectId = const EntityId('test-project-1');
       final now = DateTime.now();
 
-      // Build a small tree: root → app/ → build.gradle.kts
-      final appFolderId = EntityId('folder-app');
-      final buildFileId = EntityId('file-build');
+      // Build a small tree: root -> app/ -> build.gradle.kts
+      const appFolderId = EntityId('folder-app');
+      const buildFileId = EntityId('file-build');
 
       final nodes = [
         FileNode(
@@ -102,7 +108,6 @@ void main() {
 
     test('materializes files to temp directory', () async {
       tempPath = await materializer.materialize(projectId);
-
       expect(await Directory(tempPath).exists(), isTrue);
 
       final buildFile = File('$tempPath/app/build.gradle.kts');

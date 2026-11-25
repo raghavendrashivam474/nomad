@@ -4,8 +4,7 @@ import 'package:nomad_mobile/data/templates/android_template.dart';
 void main() {
   group('AndroidTemplate', () {
     test('contains all required project files', () {
-      final files = AndroidTemplate.files;
-
+      const files = AndroidTemplate.files;
       expect(files.containsKey('build.gradle.kts'), isTrue);
       expect(files.containsKey('settings.gradle.kts'), isTrue);
       expect(files.containsKey('gradle.properties'), isTrue);
