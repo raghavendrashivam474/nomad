@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+﻿import 'dart:async';
+import 'dart:io';
 import 'package:nomad_core/nomad_core.dart';
 import '../build_result.dart';
 import 'build_provider.dart';
@@ -62,10 +63,19 @@ class BuildOrchestrator implements BuildProvider {
   Future<BuildProvider> selectOptimalProvider() async {
     final probed = <BuildCapabilities>[];
     for (final provider in providers) {
-      final caps = await provider.getCapabilities();
-      probed.add(caps);
-      if (caps.isAvailable) {
-        return provider;
+      try {
+        final caps = await provider.getCapabilities().timeout(const Duration(seconds: 3));
+        probed.add(caps);
+        if (caps.isAvailable) {
+          return provider;
+        }
+      } catch (e) {
+        probed.add(BuildCapabilities(
+          providerType: BuildProviderType.onDeviceCompanion,
+          providerName: 'Provider Probe Error',
+          isAvailable: false,
+          unavailableReason: 'Capability check timed out or failed: $e',
+        ));
       }
     }
     return UnavailableFallbackProvider(probedCapabilities: probed);
