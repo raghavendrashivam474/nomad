@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nomad_core/nomad_core.dart';
 import '../android_build/android_build_controller.dart';
@@ -242,13 +242,25 @@ class _EditorViewState extends State<EditorView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isBusy)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8.0),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                          IconButton(
+                            key: const Key('editor_build_cancel_button'),
+                            tooltip: 'Cancel Build (${controller.statusMessage})',
+                            icon: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                ),
+                                Icon(
+                                  Icons.stop,
+                                  size: 10,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ],
                             ),
+                            onPressed: controller.cancelBuild,
                           )
                         else
                           IconButton(

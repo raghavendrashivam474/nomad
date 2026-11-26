@@ -64,14 +64,18 @@ class _WorkspaceViewState extends State<WorkspaceView> {
           hostAndroidDir: 'android',
           artifactManager: artifactManager,
         );
+        final companionProvider = CompanionBuildProvider(
+          workspaceRepository: widget.workspaceRepository,
+          contentRepository: widget.contentRepository!,
+          artifactManager: artifactManager,
+          onProgress: (status, _) {
+            _internalBuildController?.updateProgress(status);
+          },
+        );
         final orchestrator = BuildOrchestrator(
           providers: [
             LocalHostBuildProvider(buildService: buildService),
-            CompanionBuildProvider(
-              workspaceRepository: widget.workspaceRepository,
-              contentRepository: widget.contentRepository!,
-              artifactManager: artifactManager,
-            ),
+            companionProvider,
           ],
         );
         _internalBuildController = AndroidBuildController(
@@ -670,4 +674,5 @@ class _WorkspaceViewState extends State<WorkspaceView> {
     );
   }
 }
+
 
