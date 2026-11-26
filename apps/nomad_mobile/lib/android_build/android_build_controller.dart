@@ -55,6 +55,14 @@ class AndroidBuildController extends ChangeNotifier {
       _phase == BuildPhase.building ||
       _phase == BuildPhase.cancelling;
 
+  /// Updates status message and notifies UI listeners during long-running builds.
+  void updateProgress(String message) {
+    if (isBusy && _statusMessage != message) {
+      _statusMessage = message;
+      notifyListeners();
+    }
+  }
+
   /// Starts building [projectId]. Returns the final [BuildResult].
   /// Throws [StateError] if another build is already in progress.
   Future<BuildResult> startBuild(EntityId projectId) async {
@@ -86,10 +94,9 @@ class AndroidBuildController extends ChangeNotifier {
             _lastArtifact = await artifactManager.getLatestArtifact(projectId);
           }
           break;
-
         case BuildStatus.failure:
           _phase = BuildPhase.failure;
-          _statusMessage = 'Build failed';
+          _statusMessage = 'Build failed: ${result.errorMessage ?? "Check diagnostics"}';
           _classifiedError = BuildErrorClassifier.classify(
             errorMessage: result.errorMessage,
             log: result.log,
@@ -97,7 +104,6 @@ class AndroidBuildController extends ChangeNotifier {
             isCancelled: false,
           );
           break;
-
         case BuildStatus.timeout:
           _phase = BuildPhase.timeout;
           _statusMessage = 'Build timed out';
@@ -108,7 +114,6 @@ class AndroidBuildController extends ChangeNotifier {
             isCancelled: false,
           );
           break;
-
         case BuildStatus.cancelled:
           _phase = BuildPhase.cancelled;
           _statusMessage = 'Build cancelled';
@@ -120,7 +125,6 @@ class AndroidBuildController extends ChangeNotifier {
           );
           break;
       }
-
       notifyListeners();
       return result;
     } catch (e) {

@@ -169,14 +169,18 @@ class _AppShellState extends State<AppShell> {
         hostAndroidDir: 'android',
         artifactManager: artifactManager,
       );
+      final companionProvider = CompanionBuildProvider(
+        workspaceRepository: widget.workspaceRepository,
+        contentRepository: widget.contentRepository,
+        artifactManager: artifactManager,
+        onProgress: (status, _) {
+          _buildController?.updateProgress(status);
+        },
+      );
       final orchestrator = BuildOrchestrator(
         providers: [
           LocalHostBuildProvider(buildService: buildService),
-          CompanionBuildProvider(
-            workspaceRepository: widget.workspaceRepository,
-            contentRepository: widget.contentRepository,
-            artifactManager: artifactManager,
-          ),
+          companionProvider,
         ],
       );
       _buildController = AndroidBuildController(
@@ -846,4 +850,5 @@ class _TabletLayout extends StatelessWidget {
     );
   }
 }
+
 

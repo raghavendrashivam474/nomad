@@ -1,7 +1,6 @@
 ﻿#!/data/data/com.termux/files/usr/bin/bash
 set -e
-
-echo "=== Nomad Android Lab: Termux Companion Setup ==="
+echo "=== Nomad Android Lab: Termux Companion Setup (AL-4) ==="
 
 # 1. Update packages
 pkg update -y
@@ -20,15 +19,23 @@ if ! grep -q "ANDROID_HOME" "$HOME/.bashrc" 2>/dev/null; then
     echo 'export ANDROID_HOME="$HOME/android-sdk"' >> "$HOME/.bashrc"
     echo 'export PATH="$PATH:$ANDROID_HOME/platform-tools"' >> "$HOME/.bashrc"
 fi
-
 export JAVA_HOME="/data/data/com.termux/files/usr/lib/jvm/java-17-openjdk"
 export ANDROID_HOME="$HOME/android-sdk"
+
+# 5. Initialize Dart dependencies for companion agent
+AGENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$AGENT_DIR/pubspec.yaml" ]; then
+    echo "Resolving companion daemon dependencies in $AGENT_DIR..."
+    cd "$AGENT_DIR"
+    dart pub get
+fi
 
 echo ""
 echo "=== Verification ==="
 java -version
 gradle --version
 dart --version
-
 echo ""
 echo "Termux environment ready for Nomad Companion Agent!"
+echo "To start the daemon, run:"
+echo "  dart run $AGENT_DIR/agent.dart"

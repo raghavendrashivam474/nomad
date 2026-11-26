@@ -1,10 +1,12 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
 
 class CompanionJob {
   final String jobId;
+  final String? buildId;
   final String projectId;
   final String buildType;
   final Directory workspaceDir;
@@ -13,24 +15,42 @@ class CompanionJob {
   String? apkPath;
   String? apkSha256;
   int? apkByteSize;
-  String log;
+  final StringBuffer logBuffer = StringBuffer();
   String? errorMessage;
   Process? process;
 
   CompanionJob({
     required this.jobId,
+    this.buildId,
     required this.projectId,
     required this.buildType,
     required this.workspaceDir,
     required this.startedAt,
     this.status = 'queued',
-    this.log = '',
   });
 
   Duration get duration => DateTime.now().difference(startedAt);
 
+  String get log {
+    final str = logBuffer.toString();
+    const maxChars = 200 * 1024; // 200 KB max log payload
+    if (str.length <= maxChars) return str;
+    return '...[earlier log truncated]...\n${str.substring(str.length - maxChars)}';
+  }
+
+  void appendLog(String chunk) {
+    logBuffer.write(chunk);
+    // Keep internal buffer bounded to avoid runaway memory on giant builds
+    if (logBuffer.length > 500 * 1024) {
+      final text = logBuffer.toString();
+      logBuffer.clear();
+      logBuffer.write(text.substring(text.length - 200 * 1024));
+    }
+  }
+
   Map<String, dynamic> toJson() => {
     'jobId': jobId,
+    if (buildId != null) 'buildId': buildId,
     'projectId': projectId,
     'status': status,
     'durationMs': duration.inMilliseconds,
@@ -59,7 +79,7 @@ class CompanionBuildAgent {
 
       request.response.headers.add('Access-Control-Allow-Origin', '*');
       request.response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      request.response.headers.add('Access-Control-Allow-Headers', 'Content-Type, X-Nomad-Token');
+      request.response.headers.add('Access-Control-Allow-Headers', 'Content-Type, X-Nomad-Token, X-Nomad-Build-ID');
 
       if (method == 'OPTIONS') {
         request.response.statusCode = HttpStatus.ok;
@@ -80,6 +100,7 @@ class CompanionBuildAgent {
             'hostName': Platform.localHostname,
             'supportedJdkVersions': ['17', '21'],
             'port': port,
+            'version': '1.1.0-AL4',
           };
           request.response
             ..headers.contentType = ContentType.json
@@ -94,23 +115,25 @@ class CompanionBuildAgent {
           final body = await utf8.decodeStream(request);
           final payload = jsonDecode(body) as Map<String, dynamic>;
           final projectId = payload['projectId'] as String? ?? 'unknown';
+          final buildId = payload['buildId'] as String? ?? request.headers.value('x-nomad-build-id');
           final buildType = payload['buildType'] as String? ?? 'debug';
           final files = (payload['files'] as Map<String, dynamic>?) ?? {};
-          final jobId = 'job_${DateTime.now().millisecondsSinceEpoch}';
 
+          final jobId = 'job_${DateTime.now().millisecondsSinceEpoch}';
           final tempDir = await Directory.systemTemp.createTemp('nomad_companion_${jobId}_');
-          
+
           // Materialize files to temp workspace
           for (final entry in files.entries) {
             final relPath = entry.key;
             if (relPath.contains('..')) continue; // Guard against directory traversal
-            final f = File('${tempDir.path}/$relPath');
+            final f = File(p.join(tempDir.path, relPath));
             await f.parent.create(recursive: true);
             await f.writeAsString(entry.value.toString(), flush: true);
           }
 
           final job = CompanionJob(
             jobId: jobId,
+            buildId: buildId,
             projectId: projectId,
             buildType: buildType,
             workspaceDir: tempDir,
@@ -126,6 +149,7 @@ class CompanionBuildAgent {
             ..statusCode = HttpStatus.accepted
             ..write(jsonEncode({
               'jobId': jobId,
+              if (buildId != null) 'buildId': buildId,
               'status': 'building',
               'projectId': projectId,
             }));
@@ -138,10 +162,12 @@ class CompanionBuildAgent {
           final segments = path.split('/');
           final jobId = segments[segments.length - 2];
           final job = _jobs[jobId];
+
           if (job == null) {
             request.response
               ..statusCode = HttpStatus.notFound
-              ..write(jsonEncode({'error': 'Job not found'}));
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'Job not found: $jobId'}));
           } else {
             request.response
               ..headers.contentType = ContentType.json
@@ -157,21 +183,26 @@ class CompanionBuildAgent {
           final segments = path.split('/');
           final jobId = segments[segments.length - 2];
           final job = _jobs[jobId];
+
           if (job == null || job.apkPath == null || !File(job.apkPath!).existsSync()) {
             request.response
               ..statusCode = HttpStatus.notFound
+              ..headers.contentType = ContentType.json
               ..write(jsonEncode({'error': 'Artifact not found for job $jobId'}));
             await request.response.close();
             return;
           }
 
           final apkFile = File(job.apkPath!);
+          final fileLength = await apkFile.length();
+
           request.response
             ..statusCode = HttpStatus.ok
             ..headers.contentType = ContentType('application', 'vnd.android.package-archive')
             ..headers.set('Content-Disposition', 'attachment; filename="app-debug-$jobId.apk"')
-            ..headers.set('Content-Length', apkFile.lengthSync().toString())
+            ..headers.set('Content-Length', fileLength.toString())
             ..headers.set('X-APK-SHA256', job.apkSha256 ?? '');
+
           await apkFile.openRead().pipe(request.response);
           return;
         }
@@ -181,11 +212,13 @@ class CompanionBuildAgent {
           final segments = path.split('/');
           final jobId = segments[segments.length - 2];
           final job = _jobs[jobId];
+
           if (job != null) {
             job.status = 'cancelled';
             job.errorMessage = 'Build cancelled by client.';
-            job.process?.kill(ProcessSignal.sigterm);
+            _terminateJobProcess(job);
           }
+
           request.response
             ..headers.contentType = ContentType.json
             ..statusCode = HttpStatus.ok
@@ -194,27 +227,60 @@ class CompanionBuildAgent {
           return;
         }
 
+        // 6. POST /api/v1/builds/current/cancel
+        if (path == '/api/v1/builds/current/cancel' && method == 'POST') {
+          // Cancel all active jobs
+          for (final job in _jobs.values) {
+            if (job.status == 'building' || job.status == 'queued') {
+              job.status = 'cancelled';
+              job.errorMessage = 'Build cancelled by client.';
+              _terminateJobProcess(job);
+            }
+          }
+          request.response
+            ..headers.contentType = ContentType.json
+            ..statusCode = HttpStatus.ok
+            ..write(jsonEncode({'status': 'cancelled', 'count': _jobs.length}));
+          await request.response.close();
+          return;
+        }
+
         request.response
           ..statusCode = HttpStatus.notFound
+          ..headers.contentType = ContentType.json
           ..write(jsonEncode({'error': 'Endpoint not found'}));
         await request.response.close();
       } catch (e) {
         request.response
           ..statusCode = HttpStatus.internalServerError
+          ..headers.contentType = ContentType.json
           ..write(jsonEncode({'error': e.toString()}));
         await request.response.close();
       }
     });
   }
 
+  void _terminateJobProcess(CompanionJob job) {
+    if (job.process != null) {
+      try {
+        job.process!.kill(ProcessSignal.sigterm);
+        // Backup kill if process does not exit promptly
+        Timer(const Duration(seconds: 2), () {
+          try {
+            job.process?.kill(ProcessSignal.sigkill);
+          } catch (_) {}
+        });
+      } catch (_) {}
+    }
+  }
+
   void _executeBuildJob(CompanionJob job) async {
     job.status = 'building';
-    final stdoutBuf = StringBuffer();
-    final stderrBuf = StringBuffer();
+    print('[CompanionAgent] Starting execution for job ${job.jobId} (Project: ${job.projectId})');
 
     try {
       // Determine executable
-      final gradlew = File('${job.workspaceDir.path}/gradlew');
+      final gradlew = File(p.join(job.workspaceDir.path, Platform.isWindows ? 'gradlew.bat' : 'gradlew'));
       String cmd;
       List<String> args = ['assembleDebug', '--no-daemon', '--console=plain'];
 
@@ -224,7 +290,7 @@ class CompanionBuildAgent {
           await Process.run('chmod', ['+x', cmd]);
         }
       } else {
-        // Fall back to system gradle in Termux PATH
+        // Fall back to system gradle in PATH
         cmd = 'gradle';
       }
 
@@ -237,12 +303,11 @@ class CompanionBuildAgent {
       job.process = proc;
 
       proc.stdout.transform(utf8.decoder).listen((chunk) {
-        stdoutBuf.write(chunk);
-        job.log = _truncate('${stdoutBuf.toString()}\n${stderrBuf.toString()}');
+        job.appendLog(chunk);
       });
+
       proc.stderr.transform(utf8.decoder).listen((chunk) {
-        stderrBuf.write(chunk);
-        job.log = _truncate('${stdoutBuf.toString()}\n${stderrBuf.toString()}');
+        job.appendLog(chunk);
       });
 
       final exitCode = await proc.exitCode.timeout(const Duration(minutes: 5));
@@ -253,13 +318,14 @@ class CompanionBuildAgent {
       if (exitCode != 0) {
         job.status = 'failure';
         job.errorMessage = 'Gradle process exited with code $exitCode';
+        print('[CompanionAgent] Job ${job.jobId} failed with code $exitCode');
         return;
       }
 
       // Locate APK
       final apkCandidates = [
-        File('${job.workspaceDir.path}/app/build/outputs/apk/debug/app-debug.apk'),
-        File('${job.workspaceDir.path}/build/outputs/apk/debug/app-debug.apk'),
+        File(p.join(job.workspaceDir.path, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')),
+        File(p.join(job.workspaceDir.path, 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')),
       ];
 
       File? producedApk;
@@ -272,33 +338,31 @@ class CompanionBuildAgent {
 
       if (producedApk == null) {
         job.status = 'failure';
-        job.errorMessage = 'Build finished with code 0 but APK artifact was not found.';
+        job.errorMessage = 'Build finished with code 0 but APK artifact was not found in outputs.';
+        print('[CompanionAgent] Job ${job.jobId} produced no APK artifact.');
         return;
       }
 
-      // Compute SHA-256 and store metadata
+      // Compute REAL SHA-256 and store metadata
       final bytes = await producedApk.readAsBytes();
-      // Length and size verification
-      job.apkSha256 = '_';
+      final digest = sha256.convert(bytes);
+      job.apkSha256 = digest.toString();
       job.apkByteSize = bytes.length;
       job.apkPath = producedApk.path;
       job.status = 'success';
       print('[CompanionAgent] Job ${job.jobId} succeeded. APK size: ${job.apkByteSize} bytes. SHA-256: ${job.apkSha256}');
     } on TimeoutException {
-      job.process?.kill(ProcessSignal.sigterm);
+      _terminateJobProcess(job);
       job.status = 'timeout';
       job.errorMessage = 'Build timed out after 5 minutes';
+      print('[CompanionAgent] Job ${job.jobId} timed out.');
     } catch (e) {
       if (job.status != 'cancelled') {
         job.status = 'failure';
         job.errorMessage = e.toString();
+        print('[CompanionAgent] Job ${job.jobId} exception: $e');
       }
     }
-  }
-
-  String _truncate(String log, {int maxChars = 100 * 1024}) {
-    if (log.length <= maxChars) return log;
-    return '...[truncated]...\n${log.substring(log.length - maxChars)}';
   }
 
   Future<void> stop() async {
@@ -311,7 +375,9 @@ void main(List<String> args) async {
   final port = args.isNotEmpty ? int.tryParse(args[0]) ?? 8089 : 8089;
   final agent = CompanionBuildAgent(port: port);
   await agent.start();
-  print('Nomad Companion Build Daemon is running on port $port.');
-  print('Keep this Termux session active while building projects in Nomad.');
+  print('====================================================');
+  print('Nomad Companion Build Daemon (v1.1.0-AL4)');
+  print('Listening on http://127.0.0.1:$port');
+  print('Ready for on-device and LAN compilation requests.');
+  print('====================================================');
 }
-
